@@ -199,4 +199,180 @@ public class PassByValueExample {
     }
 }
 ```
-如果在方法中改变对象的字段值会改变原对象该字段值，因为改变的时
+如果在方法中改变对象的字段值会改变原对象该字段值，因为改变的是同一个地址指向的内容。
+```java
+class PassByValueExample {
+    public static void main(String[] args) {
+        Dog dog = new Dog("A");
+        func(dog);
+        System.out.println(dog.getName());          // B
+    }
+
+    private static void func(Dog dog) {
+        dog.setName("B");
+    }
+}
+```
+## float与double
+java不能隐式执行向下转型，因为这会使得精度降低。
+1.1字面量属于double类型，不能直接将1.1赋值给float变量，因为这是向下转型。
+```java
+//float f = 1.1;
+```
+1.1f字面量才是float类型。
+```java
+float f = 1.1f;
+```
+## 隐式类型转换
+因为字面量1是int类型，它比short类型精度要高，因此不能隐式地将int类型向下转型为short类型。
+```java
+short s1 = 1;
+// s1 = s1 + 1;
+```
+但是使用+=或者++运算符可以执行隐式类型转换。
+```java
+s1 += 1;
+s1++;
+```
+上面的语句相当于将s1+1的计算结果进行了向下转型：
+```java
+s1 = (short)(s1+1);
+```
+## switch
+从Java7开始，可以在switch条件判断语句中使用String对象。
+```java
+String s = "a";
+switch (s) {
+    case "a":
+        System.out.println("aaa");
+        break;
+    case "b":
+        System.out.println("bbb");
+        break;
+}
+```
+switch不支持long，是因为switch的设计初衷是对那些只有少数的几个值进行等值判断，如果值过于复杂，那么还是用if比较合适。
+```java
+// long x = 111;
+// switch (x) { // Incompatible types. Found: 'long', required: 'char, byte, short, int, Character, Byte, Short, Integer, String, or an enum'
+//     case 111:
+//         System.out.println(111);
+//         break;
+//     case 222:
+//         System.out.println(222);
+//         break;
+// }
+```
+# 四、继承
+## 访问权限
+Java中有三个访问权限修饰符：private、protected以及public，如果不加访问修饰符，表示包级可见。
+
+可以对类或类中的成员（字段以及方法）加上访问修饰符。
+
+- 类可见表示其他类可以用这个类创建实例对象。
+- 成员可见表示其他类可以用这个类的实例对象访问到该成员；
+
+protected用于修饰成员，表示在继承体系中成员对于子类可见，但是这个访问修饰符对于类没有意义。
+
+设计良好的模块会隐藏所有的实现细节，把它的API与它的实现清晰地隔离开来。模块之间只通过它们的API进行通信，一个模块不需要知道其他模块的内部工作情况，这个概念被称为信息的隐藏或封装。因此访问权限应当尽可能地使每个类或者成员不被外界访问。
+
+如果子类的方法重写的父类的方法，那么子类的访问级别不允许低于父类的访问级别。这是为了确保可以只用父类示例的地方都可以使用子类实例，也就是确保满足里氏替换原则。
+
+字段绝不能是公有的，因为这么做的话就失去了对这个字段修改行为的控制，客户端可以对其随意修改。例如下面的例子中AccessExample拥有id公有字段，如果在某个时刻，我们想要使用int存储id字段，那么就需要修改所有的客户端代码。
+```java
+public class AccessExample {
+    public String id;
+}
+```
+可以使用公有的getter和setter方法来替换公有字段，这样的话就可以控制对字段的修改行为。
+
+```java
+public class AccessExample {
+
+    private int id;
+
+    public String getId() {
+        return id + "";
+    }
+
+    public void setId(String id) {
+        this.id = Integer.valueOf(id);
+    }
+}
+```
+但是也有例外，如果是包级私有的类或者私有的嵌套类，那么直接暴露成员不会有特别大的影响。
+```java
+public class AccessWithInnerClassExample {
+
+    private class InnerClass {
+        int x;
+    }
+
+    private InnerClass innerClass;
+
+    public AccessWithInnerClassExample() {
+        innerClass = new InnerClass();
+    }
+
+    public int getValue() {
+        return innerClass.x;  // 直接访问
+    }
+}
+```
+## 抽象类与接口
+### 1.抽象类
+抽象类和抽象方法都使用abstract关键字进行声明。抽象类一般会包含抽象方法，抽象方法一定位于抽象类中。
+
+抽象类和普通类最大的区别使，抽象类不能被实例化，需要继承抽象类才能实例化其子类。
+```java
+public abstract class AbstractClassExample {
+
+    protected int x;
+    private int y;
+
+    public abstract void func1();
+
+    public void func2() {
+        System.out.println("func2");
+    }
+}
+```
+```java
+public class AbstractExtendClassExample extends AbstractClassExample {
+    @Override
+    public void func1() {
+        System.out.println("func1");
+    }
+}
+```
+```java
+// AbstractClassExample ac1 = new AbstractClassExample(); // 'AbstractClassExample' is abstract; cannot be instantiated
+AbstractClassExample ac2 = new AbstractExtendClassExample();
+ac2.func1();
+```
+### 2.接口
+接口是抽象类的延伸，在 Java 8 之前，它可以看成是一个完全抽象的类，也就是说它不能有任何的方法实现。
+
+从 Java 8 开始，接口也可以拥有默认的方法实现，这是因为不支持默认方法的接口的维护成本太高了。在 Java 8 之前，如果一个接口想要添加新的方法，那么要修改所有实现了该接口的类。
+
+接口的成员（字段 + 方法）默认都是 public 的，并且不允许定义为 private 或者 protected。
+
+接口的字段默认都是 static 和 final 的。
+```java
+public interface InterfaceExample {
+
+    void func1();
+
+    default void func2(){
+        System.out.println("func2");
+    }
+
+    int x = 123;
+    // int y;               // “y”可能没有被初始化
+    public int z = 0;       
+    // private int k = 0;   // 不允许在此处使用private修饰词
+    // protected int l = 0; // 不允许在此处使用private修饰词
+    // private void fun3(); // 不允许在此处使用private修饰词
+}
+```
+
