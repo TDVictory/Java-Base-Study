@@ -375,4 +375,230 @@ public interface InterfaceExample {
     // private void fun3(); // 不允许在此处使用private修饰词
 }
 ```
+```java
+public class InterfaceImplementExample implements InterfaceExample {
+    @Override
+    public void func1() {
+        System.out.println("func1");
+    }
+}
+```
+```java
+// InterfaceExample ie1 = new InterfaceExample(); // 'InterfaceExample' is abstract; cannot be instantiated
+InterfaceExample ie2 = new InterfaceImplementExample();
+ie2.func1();
+System.out.println(InterfaceExample.x);
+```
+### 3.比较
+- 从设计层面上看，抽象类提供了一种IS-A关系，那么就必须满足里氏替换原则，即子类对象必须能够替换掉所有父类对象。而接口更像是一种LIKE-A关系，它只提供一种方法实现契约，并不要求接口和实现接口的类具有IS-A关系。
+- 从使用上来看，一个类可以实现多个接口，但是不能继承多个抽象类。
+- 接口的字段只能是static和final类型的，而抽象类的字段没有这种限制。
+- 接口的成员只能是public的，而抽象类的成员可以有多种访问权限。
+### 4.使用选择
+使用接口：
+- 需要让不相关的类都实现一个方法。例如不相关的类都可以实现Comparable接口中的compareTo()方法；
+- 需要使用多重继承。
+使用抽象类：
+- 需要在几个相关的类中共享代码。
+- 需要能控制继承来的成员的访问权限，而不是都为public。
+- 需要继承非静态和非常量字段。
+在很多情况下，接口优先于抽象类。因为接口没有抽象类严格的类层次结构要求，可以灵活地为一个类添加行为。并且从Java8开始，接口也可以有默认的方法实现，使得修改接口的成本也变的很低。
+## super
+- 访问父类的构造函数：可以使用super()函数访问父类的构造函数，从而委托父类完成一些初始化的工作。
+- 访问父类的成员：如果子类重写了父类的某个方法，可以通过使用super关键字来引用父类的方法实现。
+```java
+public class SuperExample {
 
+    protected int x;
+    protected int y;
+
+    public SuperExample(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    public void func() {
+        System.out.println("SuperExample.func()");
+    }
+}
+```
+```java
+public class SuperExtendExample extends SuperExample {
+
+    private int z;
+
+    public SuperExtendExample(int x, int y, int z) {
+        super(x, y);
+        this.z = z;
+    }
+
+    @Override
+    public void func() {
+        super.func();
+        System.out.println("SuperExtendExample.func()");
+    }
+}
+```
+## 重写与重载
+### 1.重写（Override）
+存在于继承体系中，指子类实现了一个与父类在方法声明上完全相同的一个办法。
+
+为了满足里氏替换原则，重写有以下两个限制：
+- 子类方法的访问权限必须大于等于父类方法；
+- 子类方法的返回类型必须是父类方法返回类型或为其子类型。
+使用@Override注解，可以让编译器帮忙检查是否满足上面的两个限制条件。
+### 2.重载（Overload）
+存在于同一个类中，指一个方法与已经存在的方法名称上相同，但是参数类型、个数、顺序至少有一个不同。
+
+应该注意的是，返回值不同，其他都相同不算是重载。
+### 3.实例
+```java
+class A {
+    public String show(D obj) {
+        return ("A and D");
+    }
+
+    public String show(A obj) {
+        return ("A and A");
+    }
+}
+
+class B extends A {
+    public String show(B obj) {
+        return ("B and B");
+    }
+
+    public String show(A obj) {
+        return ("B and A");
+    }
+}
+
+class C extends B {
+}
+
+class D extends B {
+}
+```
+```java
+public class Test {
+
+    public static void main(String[] args) {
+        A a1 = new A();
+        A a2 = new B();
+        B b = new B();
+        C c = new C();
+        D d = new D();
+        System.out.println(a1.show(b)); // A and A
+        System.out.println(a1.show(c)); // A and A
+        System.out.println(a1.show(d)); // A and D
+        System.out.println(a2.show(b)); // B and A 此时a2的show（A）方法已经被重写，所以即便被转换为A也是按照B类运行
+        System.out.println(a2.show(c)); // B and A
+        System.out.println(a2.show(d)); // A and D
+        System.out.println(b.show(b));  // B and B
+        System.out.println(b.show(c));  // B and B
+        System.out.println(b.show(d));  // A and D
+    }
+}
+```
+涉及到重写时，方法调用的优先级为：
+- this.show(O)
+- super.show(O)
+- this.show((super)O)
+- super.show((super)O)
+
+# 五、Object通用方法
+## 概览
+```java
+public native int hashCode()
+
+public boolean equals(Object obj)
+
+protected native Object clone() throws CloneNotSupportedException
+
+public String toString()
+
+public final native Class<?> getClass()
+
+protected void finalize() throws Throwable {}
+
+public final native void notify()
+
+public final native void notifyAll()
+
+public final native void wait(long timeout) throws InterruptedException
+
+public final void wait(long timeout, int nanos) throws InterruptedException
+
+public final void wait() throws InterruptedException
+```
+## equals()
+### 1.等价关系
+Ⅰ 自反性
+```java
+x.equals(x);    //true
+```
+Ⅱ 对称性
+```java
+x.equals(y) == y.equals(x);     //true
+```
+Ⅲ 传递性
+```java
+if (x.equals(y) && y.equals(z))
+    x.equals(z); // true;
+```
+Ⅳ 一致性
+多次调用 equals() 方法结果不变
+```java
+x.equals(y) == x.equals(y); // true
+```
+Ⅴ 与 null 的比较
+对任何不是 null 的对象 x 调用 x.equals(null) 结果都为 false
+```java
+x.equals(null); // false;
+```
+### 2.等价与相等
+- 对于基本类型，== 判断两个值是否相等，基本类型没有 equals() 方法。
+- 对于引用类型，== 判断两个变量是否引用同一个对象，而 equals() 判断引用的对象是否等价。
+```
+Integer x = new Integer(1);
+Integer y = new Integer(1);
+System.out.println(x.equals(y)); // true
+System.out.println(x == y);      // false
+```
+### 3.实现
+- 检查是否为同一个对象的引用，如果是直接返回true；
+- 检查是否是同一个类型，如果不是，直接返回false；
+- 将Object对象进行转型；
+- 判断每个关键域是否相等
+```java
+public class EqualExample {
+
+    private int x;
+    private int y;
+    private int z;
+
+    public EqualExample(int x, int y, int z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;     //判断是否为同一引用
+        if (o == null || getClass() != o.getClass()) return false;      //判断是否为同一类型
+
+        EqualExample that = (EqualExample) o;       //将Object对象进行转型
+
+        if (x != that.x) return false;
+        if (y != that.y) return false;
+        return z == that.z;                 //判断关键域是否相等
+    }
+}
+```
+## hashCode()
+hashCode() 返回散列值，而 equals() 是用来判断两个对象是否等价。等价的两个对象散列值一定相同，但是散列值相同的两个对象不一定等价。
+
+在覆盖 equals() 方法时应当总是覆盖 hashCode() 方法，保证等价的两个对象散列值也相等。
+
+下面的代码中，新建了两个等价的对象，并将它们添加到 HashSet 中。我们希望将这两个对象当成一样的，只在集合中添加一个对象，但是因为 EqualExample 没有实现 hasCode() 方法，因此这两个对象的散列值是不同的，最终导致集合添加了两个等价的对象。
