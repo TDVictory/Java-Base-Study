@@ -813,3 +813,136 @@ e1.set(2, 222);
 System.out.println(e2.get(2)); // 2
 ```
 # 六、关键字
+## final
+### 1.数据
+声明数据为常量，可以是编译时常量，也可以是在运行时被初始化后不能被改变的常量。
+- 对于基本类型，final使数据不变；
+- 对于引用类型，final使引用不变，也就不能引用其他对象，但是被引用的对象本身是可以修改的。
+```java
+final int x = 1;
+// x = 2;  // cannot assign value to final variable 'x'
+final A y = new A();
+y.a = 1;
+```
+### 2.方法
+声明方法不能被子类重写。
+
+private方法隐式地被指定为final，如果在子类中定义的方法和基类中的一个private方法签名相同，此时子类的方法不是重写基类方法，而是在子类中定义了一个新的方法。
+### 3.类
+声明类不允许被继承。
+## static
+### 1.静态变量
+- 静态变量：又称为类变量，也就是说这个变量属于类的，类所有的实例都共享静态变量，可以直接通过类名来访问它。静态变量在内存中只存在一份。
+- 实例变量：每创建一个实例就会产生一个实例变量，它与该实例同生共死。
+```java
+public class A {
+
+    private int x;         // 实例变量
+    private static int y;  // 静态变量
+
+    public static void main(String[] args) {
+        // int x = A.x;  // Non-static field 'x' cannot be referenced from a static context
+        A a = new A();
+        int x = a.x;
+        int y = A.y;
+    }
+}
+```
+### 2.静态方法
+静态方法在类加载的时候就存在了，它步依赖于任何实例。所以静态方法必须有实现，也就是说它不能是抽象方法。
+```java
+public abstract class A {
+    public static void func1(){
+    }
+    // public abstract static void func2();  // Illegal combination of modifiers: 'abstract' and 'static'
+}
+```
+只能访问所属类的静态字段和静态方法，方法中不能有 this 和 super 关键字。
+```java
+public class A {
+
+    private static int x;
+    private int y;
+
+    public static void func1(){
+        int a = x;
+        // int b = y;  // Non-static field 'y' cannot be referenced from a static context
+        // int b = this.y;     // 'A.this' cannot be referenced from a static context
+    }
+}
+```
+### 3.静态语句块
+静态语句块在类初始化时运行一次。
+```java
+public class A {
+    static {
+        System.out.println("123");
+    }
+
+    public static void main(String[] args) {
+        A a1 = new A();
+        A a2 = new A();
+    }
+}
+
+//输出结果123
+```
+### 4.静态内部类
+非静态内部类依赖于外部类的实例，而静态内部类不需要
+```java
+public class OuterClass {
+
+    class InnerClass {
+    }
+
+    static class StaticInnerClass {
+    }
+
+    public static void main(String[] args) {
+        // InnerClass innerClass = new InnerClass(); // 此时InnerClass还未实例化
+        OuterClass outerClass = new OuterClass();
+        InnerClass innerClass = outerClass.new InnerClass();
+        StaticInnerClass staticInnerClass = new StaticInnerClass();
+    }
+}
+```
+静态内部类不能访问外部类的非静态的变量和方法。
+### 5.静态导包
+在使用静态变量和方法时不用再指明 ClassName，从而简化代码，但可读性大大降低。
+```java
+import static com.xxx.ClassName.*
+```
+### 6.初始化顺序
+静态变量和静态语句块优先于实例变量和普通语句块，静态变量和静态语句块的初始化顺序取决于它们在代码中的顺序。
+
+存在继承的情况下，初始化顺序为：
+
+- 父类（静态变量、静态语句块）
+- 子类（静态变量、静态语句块）
+- 父类（实例变量、普通语句块）
+- 父类（构造函数）
+- 子类（实例变量、普通语句块）
+- 子类（构造函数）
+# 七、反射
+每个类都有一个 Class 对象，包含了与类有关的信息。当编译一个新类时，会产生一个同名的 .class 文件，该文件内容保存着 Class 对象。
+
+类加载相当于 Class 对象的加载，类在第一次使用时才动态加载到 JVM 中。也可以使用```Class.forName("com.mysql.jdbc.Driver")```这种方式来控制类的加载，该方法会返回一个 Class 对象。
+
+反射可以提供运行时的类信息，并且这个类可以在运行时才加载进来，甚至在编译时期该类的 .class 不存在也可以加载进来。
+
+Class和java.lang.reflect一起对反射提供了支持，java.lang.reflect类库主要包含了以下三个类：
+- **Field**：可以使用get()和set()方法读取和修改Field对象关联的字段；
+- **Method**：可以使用invoke()方法调用与Method对象关联的方法；
+- **Constructor**：可以用Constructor创建新的对象。
+### 反射的优点：
+- **可扩展性**：应用程序可以利用全限定名创建可扩展对象的实例，来使用来自外部的用户自定义类。
+- **类浏览器和可视化开发环境**：一个类浏览器需要可以枚举类的成员。可视化开发环境（如IDE）可以从利用反射中可用的类型信息中受益，以帮助程序员编写正确的代码。
+- **调试器和测试工具**：调试器需要能够检查一个类里的私有成员。测试工具可用利用反射来自动地调用类里定义的可被发现的API定义，以确保一组测试中有较高的代码覆盖率。
+### 反射的缺点：
+尽管反射非常强大，但也不能滥用。如果一个功能可以不用反射完成，那么最好就不用。在我们使用反射技术时，下面几条内容应该牢记于心。
+
+- **性能开销** ：反射涉及了动态类型的解析，所以 JVM 无法对这些代码进行优化。因此，反射操作的效率要比那些非反射操作低得多。我们应该避免在经常被执行的代码或对性能要求很高的程序中使用反射。
+
+- **安全限制** ：使用反射技术要求程序必须在一个没有安全限制的环境中运行。如果一个程序必须在有安全限制的环境中运行，如 Applet，那么这就是个问题了。
+
+- **内部暴露** ：由于反射允许代码执行一些在正常情况下不被允许的操作（比如访问私有的属性和方法），所以使用反射可能会导致意料之外的副作用，这可能导致代码功能失调并破坏可移植性。反射代码破坏了抽象性，因此当平台发生改变的时候，代码的行为就有可能也随着变化。
