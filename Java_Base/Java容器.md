@@ -188,4 +188,76 @@ LinkedList在任意位置添加删除元素更快，ArrayList在查找任意元�
 ```
 transient Entry[] table;
 ```
- 
+ Entry存储着键值对，它包含了四个字段，从next字段我们可以看出Entry是一个链表。即数组中的每个位置被当成一个桶，一个桶存放一个链表。HashMap使用拉链法来解决冲突，同一个链表中存放哈希值和散列桶取模运算结果相同的Entry。
+
+```
+static class Entry<K,V> implements Map.Entry<K,V> {
+    final K key;
+    V value;
+    Entry<K,V> next;
+    int hash;
+
+    Entry(int h, K k, V v, Entry<K,V> n) {
+        value = v;
+        next = n;
+        key = k;
+        hash = h;
+    }
+
+    public final K getKey() {
+        return key;
+    }
+
+    public final V getValue() {
+        return value;
+    }
+
+    public final V setValue(V newValue) {
+        V oldValue = value;
+        value = newValue;
+        return oldValue;
+    }
+
+    public final boolean equals(Object o) {
+        if (!(o instanceof Map.Entry))
+            return false;
+        Map.Entry e = (Map.Entry)o;
+        Object k1 = getKey();
+        Object k2 = e.getKey();
+        if (k1 == k2 || (k1 != null && k1.equals(k2))) {
+            Object v1 = getValue();
+            Object v2 = e.getValue();
+            if (v1 == v2 || (v1 != null && v1.equals(v2)))
+                return true;
+        }
+        return false;
+    }
+
+    public final int hashCode() {
+        return Objects.hashCode(getKey()) ^ Objects.hashCode(getValue());
+    }
+
+    public final String toString() {
+        return getKey() + "=" + getValue();
+    }
+}
+```
+#### 2.拉链法的工作原理
+```
+HashMap<String, String> map = new HashMap<>();
+map.put("K1", "V1");
+map.put("K2", "V2");
+map.put("K3", "V3");
+```
+- 新建一个HashMap，默认大小为16；
+- 插入<K1，V1>键值对，先计算K1的hashCode为115，使用除留余数法得到所在的桶下标115 % 16 = 3。
+- 插入 <K2,V2> 键值对，先计算 K2 的 hashCode 为 118，使用除留余数法得到所在的桶下标 118 % 16 = 6。
+- 插入 <K3,V3> 键值对，先计算 K3 的 hashCode 为 118，使用除留余数法得到所在的桶下标 118 % 16 = 6，插在 <K2,V2> 前面。
+
+应该注意到链表的插入是以头插法方式进行的，例如上面的 <K3,V3> 不是插在 <K2,V2> 后面，而是插入在链表头部。
+
+查找需要分成两步进行：
+
+- 计算键值对所在的桶；
+- 在链表上顺序查找，时间复杂度显然和链表的长度成正比。
+
