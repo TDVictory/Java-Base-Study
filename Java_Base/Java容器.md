@@ -394,5 +394,5 @@ static int indexFor(int h, int length) {
 
 和扩容相关的残烛主要有：capacity、size、threshold和load_dactor。
 | 参数 | 含义 |
-| - | - |
+| :--: | :-- |
 | capacity | table的容量大小，默认16.需要注意的是capacity必须保证为2的n次方，我们在4.2里面学到的取模需要2的n次方。 |
