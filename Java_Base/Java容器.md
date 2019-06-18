@@ -42,10 +42,10 @@ List list = Arrays.asList(arr);
 List list = Arrays.asList(1, 2, 3);
 ```
 
-## 三、源码分析
+# 三、源码分析
 如果没有特别说明，以下源码分析基于JDK1.8.
-### ArrayList
-#### 1.概览
+## ArrayList
+### 1.概览
 因为ArrayList是基于数组实现的，所以支持快速随机访问。RandomAccess接口标识着该类支持快速随机访问。
 ```
 public class ArrayList<E> extends AbstractList<E>
@@ -55,7 +55,7 @@ public class ArrayList<E> extends AbstractList<E>
 ```
 private static final int DEFAULT_CAPACITY = 10;
 ```
-#### 2.扩容
+### 2.扩容
 添加元素时使用 ensureCapacityInternal() 方法来保证容量足够，如果不够时，需要使用 grow() 方法进行扩容，新容量的大小为 oldCapacity + (oldCapacity >> 1)，也就是旧容量的 1.5 倍。
 
 扩容操作需要调用 Arrays.copyOf() 把原数组整个复制到新数组中，这个操作代价很高，因此最好在创建 ArrayList 对象时就指定大概的容量大小，减少扩容操作的次数。
@@ -94,7 +94,7 @@ private void grow(int minCapacity) {
 }
 ```
 
-#### 3.删除元素
+### 3.删除元素
 需要调用 System.arraycopy() 将 index+1 后面的元素都复制到 index 位置上，该操作的时间复杂度为 O(N)，可以看出 ArrayList 删除元素的代价是非常高的。
 ```
 public E remove(int index) {
@@ -108,18 +108,18 @@ public E remove(int index) {
     return oldValue;
 }
 ```
-#### 4. Fail-Fast
+### 4. Fail-Fast
 modCount 用来记录 ArrayList 结构发生变化的次数。结构发生变化是指添加或者删除至少一个元素的所有操作，或者是调整内部数组的大小，仅仅只是设置元素的值不算结构发生变化。
 
 在进行序列化或者迭代等操作时，需要比较操作前后 modCount 是否改变，如果改变了需要抛出 ConcurrentModificationException。
 
-#### 5. 序列化
+### 5. 序列化
 ArrayList 基于数组实现，并且具有动态扩容特性，因此保存元素的数组不一定都会被使用，那么就没必要全部进行序列化。
 
 保存元素的数组 elementData 使用 transient 修饰，该关键字声明数组默认不会被序列化
 
-### Vector
-#### 1.同步
+## Vector
+### 1.同步
 它的实现与ArrayList类似，但是使用了synchronized进行同步。
 ```
 public synchronized boolean add(E e) {
@@ -136,11 +136,11 @@ public synchronized E get(int index) {
     return elementData(index);
 }
 ```
-#### 2.与ArrayList的比较
+### 2.与ArrayList的比较
 - Vector 是同步的，因此开销就比 ArrayList 要大，访问速度更慢。最好使用 ArrayList 而不是 Vector，因为同步操作完全可以由程序员自己来控制
 - Vector 每次扩容请求其大小的 2 倍空间，而 ArrayList 是 1.5 倍。
 
-#### 3.替代方案
+### 3.替代方案
 可以使用Collections.synchronizedList(); 得到一个线程安全的 ArrayList。
 ```
 List<String> list = new ArrayList<>();
@@ -151,23 +151,23 @@ List<String> synList = Collections.synchronizedList(list);
 List<String> list = new CopyOnWriteArrayList<>();
 ```
 
-### CopyOnWriteArrayList
-#### 读写分离
+## CopyOnWriteArrayList
+### 读写分离
 写操作在一个复制的数组上进行，读操作还是在原始数组中进行，读写分离，互不影响。
 
 写操作需要加锁，防止并发写入时导致写入数据丢失。
 
 写操作结束之后需要把原始数组指向新的复制数组。
 
-#### 适用场景
+### 适用场景
 CopyOnWriteArrayList在写操作的同时允许读操作，大大提高了读操作的性能，因此很适合读多写少的应用场景。
 但是CopyOnWriteArrayList也有其缺陷：
 - 内存占用：在写操作时需要复制一个新的数组，使得内存占用为原来的两倍左右。
 - 数据不一致：读操作不能读取实时性的数据，因为部分写操作的数据还未同步到读数组中。
 所以CopyOnWriteArrayList不适用于内存敏感以及对实时性要求很高的场景。
 
-### LinkedList
-#### 1.概览
+## LinkedList
+### 1.概览
 基于双向链表实现，使用Node存储链表节点信息。
 ```
 private static class Node<E> {
@@ -176,14 +176,14 @@ private static class Node<E> {
     Node<E> prev;
 }
 ```
-#### 2.与ArrayList的比较
+### 2.与ArrayList的比较
 - ArrayList基于动态数组实现，LinkedList基于双向链表实现
 - ArrayList支持随机访问，LinkedList不支持
 LinkedList在任意位置添加删除元素更快，ArrayList在查找任意元素更快
  
-### HashMap
+## HashMap
 以下源码为JDK1.7
-#### 1.存储结构
+### 1.存储结构
 内部包含了一个Entry类型的数组table
 ```
 transient Entry[] table;
@@ -242,7 +242,7 @@ static class Entry<K,V> implements Map.Entry<K,V> {
     }
 }
 ```
-#### 2.拉链法的工作原理
+### 2.拉链法的工作原理
 ```
 HashMap<String, String> map = new HashMap<>();
 map.put("K1", "V1");
@@ -261,3 +261,130 @@ map.put("K3", "V3");
 - 计算键值对所在的桶；
 - 在链表上顺序查找，时间复杂度显然和链表的长度成正比。
 
+### 3. put 操作
+```
+public V put(K key, V value) {
+    if (table == EMPTY_TABLE) {
+        inflateTable(threshold);
+    }
+    // 键为 null 单独处理
+    if (key == null)
+        return putForNullKey(value);
+    int hash = hash(key);
+    // 确定桶下标
+    int i = indexFor(hash, table.length);
+    // 先找出是否已经存在键为 key 的键值对，如果存在的话就更新这个键值对的值为 value
+    for (Entry<K,V> e = table[i]; e != null; e = e.next) {
+        Object k;
+        if (e.hash == hash && ((k = e.key) == key || key.equals(k))) {
+            V oldValue = e.value;
+            e.value = value;
+            e.recordAccess(this);
+            return oldValue;
+        }
+    }
+
+    modCount++;
+    // 插入新键值对
+    addEntry(hash, key, value, i);
+    return null;
+}
+```
+HashMap 允许插入键为 null 的键值对。但是因为无法调用 null 的 hashCode() 方法，也就无法确定该键值对的桶下标，只能通过强制指定一个桶下标来存放。HashMap 使用第 0 个桶存放键为 null 的键值对。
+```
+private V putForNullKey(V value) {
+    for (Entry<K,V> e = table[0]; e != null; e = e.next) {
+        if (e.key == null) {
+            V oldValue = e.value;
+            e.value = value;
+            e.recordAccess(this);
+            return oldValue;
+        }
+    }
+    modCount++;
+    addEntry(0, null, value, 0);
+    return null;
+}
+```
+使用链表的头插法，也就是新的键值对插在链表的头部，而不是链表的尾部。
+```
+void addEntry(int hash, K key, V value, int bucketIndex) {
+    if ((size >= threshold) && (null != table[bucketIndex])) {
+        resize(2 * table.length);
+        hash = (null != key) ? hash(key) : 0;
+        bucketIndex = indexFor(hash, table.length);
+    }
+
+    createEntry(hash, key, value, bucketIndex);
+}
+
+void createEntry(int hash, K key, V value, int bucketIndex) {
+    Entry<K,V> e = table[bucketIndex];
+    // 头插法，链表头部指向新的键值对
+    table[bucketIndex] = new Entry<>(hash, key, value, e);
+    size++;
+}
+```
+```
+Entry(int h, K k, V v, Entry<K,V> n) {
+    value = v;
+    next = n;
+    key = k;
+    hash = h;
+}
+```
+### 4. 确定桶下标
+很多操作都需要先确定一个键值对所在的桶下标。
+```
+int hash = hash(key);
+int i = indexFor(hash, table.length);
+```
+#### 4.1 计算 hash 值
+```
+final int hash(Object k) {
+    int h = hashSeed;
+    if (0 != h && k instanceof String) {
+        return sun.misc.Hashing.stringHash32((String) k);
+    }
+
+    h ^= k.hashCode();
+
+    // This function ensures that hashCodes that differ only by
+    // constant multiples at each bit position have a bounded
+    // number of collisions (approximately 8 at default load factor).
+    h ^= (h >>> 20) ^ (h >>> 12);
+    return h ^ (h >>> 7) ^ (h >>> 4);
+}
+```
+```
+public final int hashCode() {
+    return Objects.hashCode(key) ^ Objects.hashCode(value);
+}
+```
+#### 4.2 取模
+令 x = 1<<4，即 x 为 2 的 4 次方，它具有以下性质：
+```
+x   : 00010000
+x-1 : 00001111
+```
+令一个数 y 与 x-1 做与运算，可以去除 y 位级表示的第 4 位以上数：
+```
+y       : 10110010
+x-1     : 00001111
+y&(x-1) : 00000010
+```
+这个性质和 y 对 x 取模效果是一样的：
+```
+y   : 10110010
+x   : 00010000
+y%x : 00000010
+```
+我们知道，位运算的代价比求模运算小的多，因此在进行这种计算时用位运算的话能带来更高的性能。
+
+确定桶下标的最后一步是将 key 的 hash 值对桶个数取模：hash%capacity，如果能保证 capacity 为 2 的 n 次方，那么就可以将这个操作转换为位运算。
+```
+static int indexFor(int h, int length) {
+    return h & (length-1);
+}
+```
+### 5.扩容-基本原理
