@@ -397,3 +397,82 @@ static int indexFor(int h, int length) {
 | 参数 | 含义 |
 | :--: | :-- |
 | capacity | table的容量大小，默认16.需要注意的是capacity必须保证为2的n次方，我们在4.2里面学到的取模需要2的n次方。 |
+| size | 键值对数量 |
+| threshold | size的临界值，当size大于等于threhold就必须进行扩容操作 |
+| loadFactor | 装载因子，table能够使用的比例，threshold = capacity * loadFactor。 |
+```
+static final int DEFAULT_INITIAL_CAPACITY = 16;
+
+static final int MAXIMUM_CAPACITY = 1 << 30;
+
+static final float DEFAULT_LOAD_FACTOR = 0.75f;
+
+transient Entry[] table;
+
+transient int size;
+
+int threshold;
+
+final float loadFactor;
+
+transient int modCount;
+```
+从下面的添加Entry代码中可以看出，一旦触发扩容（size大于等于threshold时）
+```
+void addEntry(int hash, K key, V value, int bucketIndex) {
+    Entry<K,V> e = table[bucketIndex];
+    table[bucketIndex] = new Entry<>(hash, key, value, e);
+    if (size++ >= threshold)
+        resize(2 * table.length);
+}
+```
+扩容使用 resize() 实现，需要注意的是，扩容操作同样需要把 oldTable 的所有键值对重新插入 newTable 中，因此这一步是很费时的。
+```
+void resize(int newCapacity) {
+    Entry[] oldTable = table;
+    int oldCapacity = oldTable.length;
+    if (oldCapacity == MAXIMUM_CAPACITY) {
+        threshold = Integer.MAX_VALUE;
+        return;
+    }
+    Entry[] newTable = new Entry[newCapacity];
+    transfer(newTable);
+    table = newTable;
+    threshold = (int)(newCapacity * loadFactor);
+}
+```
+transfer则是将原先table中的所有内容复制到新的table中，并将原table清空。
+```
+void transfer(Entry[] newTable) {
+    Entry[] src = table;
+    int newCapacity = newTable.length;
+    for (int j = 0; j < src.length; j++) {
+        Entry<K,V> e = src[j];
+        if (e != null) {
+            src[j] = null;
+            do {
+                Entry<K,V> next = e.next;
+                int i = indexFor(e.hash, newCapacity);
+                e.next = newTable[i];
+                newTable[i] = e;
+                e = next;
+            } while (e != null);
+        }
+    }
+}
+```
+### 6. 扩容-重新计算桶下标
+在进行扩容时，需要把键值对重新放到对应的桶上。HashMap 使用了一个特殊的机制，可以降低重新计算桶下标的操作。
+
+假设原数组长度 capacity 为 16，扩容之后 new capacity 为 32：
+```
+capacity     : 00010000
+new capacity : 00100000
+```
+即我们在进行取模的时候会需要多判定一位，那也即我们可以只判断多出来的那一位即可：
+
+对于一个Key（16扩容到32）
+- 它的哈希值如果在第 5 位上为 0，那么取模得到的结果和之前一样；
+- 如果为 1，那么得到的结果为原来的结果 +16。
+### 7. 计算数组容量
+
