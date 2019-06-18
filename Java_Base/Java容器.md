@@ -393,6 +393,7 @@ static int indexFor(int h, int length) {
 为了查找的足够快，我们需要N/M足够小，因此我们需要保证M尽可能大，也即所说的Table要尽可能大。HashMap会采用动态扩容来根据当前的N值来调整M值，使得空间效率和时间效率都能得到保证。
 
 和扩容相关的残烛主要有：capacity、size、threshold和load_dactor。
+
 | 参数 | 含义 |
 | :--: | :-- |
 | capacity | table的容量大小，默认16.需要注意的是capacity必须保证为2的n次方，我们在4.2里面学到的取模需要2的n次方。 |
