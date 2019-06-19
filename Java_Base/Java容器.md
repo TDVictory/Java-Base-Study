@@ -588,3 +588,21 @@ JDK 1.8 使用了 CAS 操作来支持更高的并发度，在 CAS 操作失败�
 - 在高并发环境下，统计数据(计算size...等等)其实是无意义的，因为在下一时刻size值就变化了。
 - get方法是非阻塞，无锁的。重写Node类，通过volatile修饰next来实现每次获取都是最新设置的值
 - ConcurrentHashMap的key和Value都不能为null
+## LinkedHashMap
+### 存储结构
+继承自HashMap，因此具有和HashMap一样的快速查找特性
+```
+public class LinkedHashMap<K,V> extends HashMap<K,V> implements Map<K,V>
+```
+内部维护了一个双向链表，用来维护插入顺序或者LRU顺序。
+```
+/**
+ * The head (eldest) of the doubly linked list.
+ */
+transient LinkedHashMap.Entry<K,V> head;
+
+/**
+ * The tail (youngest) of the doubly linked list.
+ */
+transient LinkedHashMap.Entry<K,V> tail;
+```
