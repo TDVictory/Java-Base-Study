@@ -475,4 +475,116 @@ new capacity : 00100000
 - 它的哈希值如果在第 5 位上为 0，那么取模得到的结果和之前一样；
 - 如果为 1，那么得到的结果为原来的结果 +16。
 ### 7. 计算数组容量
+HashMap的构造函数允许我们传入不是2的n次方的容量设置。但是我们之前说过了，在确定桶下标的时候由于取模是位运算，非2的n次方是无法使用这种方法的，所以HashMap就后台偷偷地将我们传入的容量转换成了2的n次方。
 
+对于任何一个输入的数，首先将其转换成二进制。假设输入参数为10010000，我们看看它是怎么变换的：
+```
+mask |= mask >> 1    11011000
+mask |= mask >> 2    11111110
+mask |= mask >> 4    11111111
+mask += 1           100000000
+```
+我们可以看到HashMap通过每次对输入值或运算它的右移2的n-1次位，每次保证前2的n次位均为1.最后将输入参数的所有位都填为1，再加一就可以得到新的容量了。
+
+下面是HashMap中计算数组容量的代码：
+```
+static final int tableSizeFor(int cap) {
+    int n = cap - 1;
+    n |= n >>> 1;
+    n |= n >>> 2;
+    n |= n >>> 4;
+    n |= n >>> 8;
+    n |= n >>> 16;
+    return (n < 0) ? 1 : (n >= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACITY : n + 1;
+}
+```
+在java中，int是32位，所以这里最多只需要右移16位就可以全部覆盖了=。=
+
+### 8.链表转红黑树
+从JDK1.8开始，一个桶存储的链表长度大于8时会将链表转换位红黑树。
+
+### 9.与HashTable的比较
+- HashTable使用synchronized来进行同步，所以相对于HashTable来说HashMap是线程不安全的。
+- HashTable不可以插入键位null的Entry。
+- HashMap的迭代器是fail-fast迭代器。（因为HashMap是线程不安全的，在线程1读取内容时，线程2改变了HashMap的结构，fail-fast迭代器会抛出ConcurrentModificationException的异常）
+- HashMap 不能保证随着时间的推移 Map 中的元素次序是不变的。
+
+## ConcurrentHashMap
+我们知道因为HashMap因为是线程不安全的，所以在读写速度上超过HashTable。但是如果需要保证线程安全，Java5以后提供了ConcurrentHashMap这个结构，此后HashTable就淡出了我们的视线。
+
+### 1 JDK1.7底层实现
+在JDK1.7中，ConcurrentHashMap通过“锁分段”来实现线程安全。ConcurrentHashMap将哈希表分成许多片段（segments），每一个片段（table）都类似于HashMap，它有一个HashEntry数组，数组的每项又是HashEntry组成的链表。每个片段都是Segment类型的，Segment继承了ReentrantLock，所以Segment本质上是一个可重入的互斥锁。这样每个片段都有了一个锁，这就是“锁分段”。线程如想访问某一key-value键值对，需要先获取键值对所在的segment的锁，获取锁后，其他线程就不能访问此segment了，但可以访问其他的segment。
+```
+static final class HashEntry<K,V> {
+    final int hash;
+    final K key;
+    volatile V value;
+    volatile HashEntry<K,V> next;
+}
+```
+ConcurrentHashMap 和 HashMap 实现上类似，最主要的差别是 ConcurrentHashMap 采用了分段锁（Segment），每个分段锁维护着几个桶（HashEntry），多个线程可以同时访问不同分段锁上的桶，从而使其并发度更高（并发度就是 Segment 的个数）。
+
+Segment 继承自 ReentrantLock。
+```
+static final class Segment<K,V> extends ReentrantLock implements Serializable {
+
+    private static final long serialVersionUID = 2249069246763182397L;
+
+    static final int MAX_SCAN_RETRIES =
+        Runtime.getRuntime().availableProcessors() > 1 ? 64 : 1;
+
+    transient volatile HashEntry<K,V>[] table;
+
+    transient int count;
+
+    transient int modCount;
+
+    transient int threshold;
+
+    final float loadFactor;
+}
+```
+```
+final Segment<K,V>[] segments;
+```
+默认的并发级别为16，也就是说默认创建16个Segment。
+```
+static final int DEFAULT_CONCURRENCY_LEVEL = 16;
+```
+
+### 2.JDK1.8底层实现
+在JDK1.8中，ConcurrentHashMap放弃了“锁分段”，取而代之的是类似于HashMap的数组+链表+红黑树结构，使用CAS算法和synchronized实现线程安全。
+#### 2.1 CAS算法和volatile简单介绍
+**CAS（比较与交换，Compare and swap）** 是一种无锁算法。
+
+CAS有3个操作数
+- 内存值V
+- 旧的预期值A
+- 要修改的新值B
+当且仅当预期值A和内存值V相同时，将内存值V修改为B，否则什么都不做
+
+- 当多个线程尝试使用CAS同时更新同一个变量时，只有其中一个线程能更新变量的值(A和内存值V相同时，将内存值V修改为B)，而其它线程都失败，失败的线程并不会被挂起，而是被告知这次竞争中失败，并可以再次尝试(否则什么都不做)
+
+看了上面的描述应该就很容易理解了，先比较是否相等，如果相等则替换(CAS算法)
+
+**volatile关键字**
+volatile经典总结：volatile仅仅用来保证该变量对所有线程的可见性，但不保证原子性。
+
+- 保证该变量对所有线程的可见性
+        - 在多线程的环境下：当这个变量修改时，所有的线程都会知道该变量被修改了，也就是所谓的“可见性”
+- 不保证原子性
+        - 修改变量(赋值)实质上是在JVM中分了好几步，而在这几步内(从装载变量到修改)，它是不安全的。
+        
+### 3 JDK 1.8 的改动
+JDK 1.7 使用分段锁机制来实现并发更新操作，核心类为 Segment，它继承自重入锁 ReentrantLock，并发度与 Segment 数量相等。
+
+JDK 1.8 使用了 CAS 操作来支持更高的并发度，在 CAS 操作失败时使用内置锁 synchronized。
+
+并且 JDK 1.8 的实现也在链表过长时会转换为红黑树。
+
+### 4 总结
+- 底层结构是散列表(数组+链表)+红黑树，这一点和HashMap是一样的。
+- Hashtable是将所有的方法进行同步，效率低下。而ConcurrentHashMap作为一个高并发的容器，它是通过部分锁定+CAS算法来进行实现线程安全的。CAS算法也可- - 以认为是乐观锁的一种~
+- 在高并发环境下，统计数据(计算size...等等)其实是无意义的，因为在下一时刻size值就变化了。
+- get方法是非阻塞，无锁的。重写Node类，通过volatile修饰next来实现每次获取都是最新设置的值
+- ConcurrentHashMap的key和Value都不能为null
