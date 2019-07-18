@@ -497,6 +497,7 @@ java.util.concurrent 类库中提供了 Condition 类来实现线程之间的协
 相比于 wait() 这种等待方式，await() 可以指定等待的条件，因此更加灵活。
 
 使用 Lock 来获取一个 Condition 对象。
+不同的Condition的await只能通过自身的signal()和signalAll()来唤起。
 
 ```
 public class AwaitSignalExample {
@@ -539,3 +540,555 @@ public static void main(String[] args) {
 before
 after
 ```
+
+# 七、J.U.C - AQS
+java.util.concurrent（J.U.C）大大提高了并发性能，AQS 被认为是 J.U.C 的核心。
+## CountDownLatch
+用来控制一个或者多个线程等待多个线程。
+
+维护了一个计数器 cnt，每次调用 countDown() 方法会让计数器的值减 1，减到 0 的时候，那些因为调用 await() 方法而在等待的线程就会被唤醒。
+
+```
+public class CountdownLatchExample {
+
+    public static void main(String[] args) throws InterruptedException {
+        final int totalThread = 10;
+        CountDownLatch countDownLatch = new CountDownLatch(totalThread);
+        ExecutorService executorService = Executors.newCachedThreadPool();
+        for (int i = 0; i < totalThread; i++) {
+            executorService.execute(() -> {
+                System.out.print("run..");
+                countDownLatch.countDown();
+            });
+        }
+        //运行到这步的时候说明十条线程都在进行，利用countDownLatch的await将主线程阻塞，等待十条线程结束后解开。
+        countDownLatch.await();
+        System.out.println("end");
+        executorService.shutdown();
+    }
+}
+```
+```
+run..run..run..run..run..run..run..run..run..run..end
+```
+
+## CyclicBarrier
+用来控制多个线程互相等待，只有当多个线程都到达时，这些线程才会继续执行。
+
+和 CountdownLatch 相似，都是通过维护计数器来实现的。线程执行 await() 方法之后计数器会减 1，并进行等待，直到计数器为 0，所有调用 await() 方法而在等待的线程才能继续执行。
+
+CyclicBarrier 和 CountdownLatch 的一个区别是，CyclicBarrier 的计数器通过调用 reset() 方法可以循环使用，所以它才叫做循环屏障。
+
+CyclicBarrier 有两个构造函数，其中 parties 指示计数器的初始值，barrierAction 在所有线程都到达屏障的时候会执行一次。
+```
+public CyclicBarrier(int parties, Runnable barrierAction) {
+    if (parties <= 0) throw new IllegalArgumentException();
+    this.parties = parties;
+    this.count = parties;
+    this.barrierCommand = barrierAction;
+}
+
+public CyclicBarrier(int parties) {
+    this(parties, null);
+}
+```
+```
+public class CyclicBarrierExample {
+
+    public static void main(String[] args) {
+        final int totalThread = 10;
+        CyclicBarrier cyclicBarrier = new CyclicBarrier(totalThread);
+        ExecutorService executorService = Executors.newCachedThreadPool();
+        for (int i = 0; i < totalThread; i++) {
+            executorService.execute(() -> {
+                System.out.print("before..");
+                try {
+                    cyclicBarrier.await();
+                } catch (InterruptedException | BrokenBarrierException e) {
+                    e.printStackTrace();
+                }
+                System.out.print("after..");
+            });
+        }
+        executorService.shutdown();
+    }
+}
+```
+```
+before..before..before..before..before..before..before..before..before..before..after..after..after..after..after..after..after..after..after..after..
+```
+## Semaphore
+Semaphore 类似于操作系统中的信号量，可以控制对互斥资源的访问线程数。
+
+以下代码模拟了对某个服务的并发请求，每次只能有 3 个客户端同时访问，请求总数为 10。
+```
+public class SemaphoreExample {
+
+    public static void main(String[] args) {
+        final int clientCount = 3;
+        final int totalRequestCount = 10;
+        Semaphore semaphore = new Semaphore(clientCount);
+        ExecutorService executorService = Executors.newCachedThreadPool();
+        for (int i = 0; i < totalRequestCount; i++) {
+            executorService.execute(()->{
+                try {
+                    semaphore.acquire();
+                    System.out.print(semaphore.availablePermits() + " ");
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    semaphore.release();
+                }
+            });
+        }
+        executorService.shutdown();
+    }
+}
+```
+在semaphore.acquire()和semaphore.release()之间的代码同一时间只能有设定个数的线程访问。
+```
+2 1 2 2 2 2 2 1 2 2
+```
+# 八、J.U.C - 其它组件
+## FutureTask
+在介绍 Callable 时我们知道它可以有返回值，返回值通过 Future 进行封装。FutureTask 实现了 RunnableFuture 接口，该接口继承自 Runnable 和 Future 接口，这使得 FutureTask 既可以当做一个任务执行，也可以有返回值。
+```
+public class FutureTask<V> implements RunnableFuture<V>
+```
+```
+public interface RunnableFuture<V> extends Runnable, Future<V>
+```
+FutureTask 可用于异步获取执行结果或取消执行任务的场景。当一个计算任务需要执行很长时间，那么就可以用 FutureTask 来封装这个任务，主线程在完成自己的任务之后再去获取结果。
+```
+public class FutureTaskExample {
+public class Main {
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
+        FutureTask<Integer> futureTask = new FutureTask<Integer>(new Callable<Integer>() {
+            @Override
+            public Integer call() throws Exception {
+                int result = 0;
+                for (int i = 0; i < 100; i++) {
+                    Thread.sleep(20);
+                    result += i;
+                }
+                return result;
+            }
+        });
+
+        Thread computeThread = new Thread(futureTask);
+        computeThread.start();
+        System.out.println("other task is running...");            
+        System.out.println(futureTask.get());
+        System.out.println("end");
+    }
+}
+}
+```
+```
+other task is running...
+4950
+end
+```
+
+## BlockingQueue
+java.util.concurrent.BlockingQueue 接口有以下阻塞队列的实现：
+
+- FIFO 队列 ：LinkedBlockingQueue、ArrayBlockingQueue（固定长度）
+- 优先级队列 ：PriorityBlockingQueue
+提供了阻塞的 take() 和 put() 方法：如果队列为空 take() 将阻塞，直到队列中有内容；如果队列为满 put() 将阻塞，直到队列有空闲位置。
+
+使用 BlockingQueue 实现生产者消费者问题
+```
+public class ProducerConsumer {
+
+    private static BlockingQueue<String> queue = new ArrayBlockingQueue<>(5);
+
+    private static class Producer extends Thread {
+        @Override
+        public void run() {
+            try {
+                queue.put("product");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.print("produce..");
+        }
+    }
+
+    private static class Consumer extends Thread {
+
+        @Override
+        public void run() {
+            try {
+                String product = queue.take();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.print("consume..");
+        }
+    }
+}
+```
+```
+public static void main(String[] args) {
+    for (int i = 0; i < 2; i++) {
+        Producer producer = new Producer();
+        producer.start();
+    }
+    for (int i = 0; i < 5; i++) {
+        Consumer consumer = new Consumer();
+        consumer.start();
+    }
+    for (int i = 0; i < 3; i++) {
+        Producer producer = new Producer();
+        producer.start();
+    }
+}
+```
+```
+produce..produce..consume..consume..produce..consume..produce..consume..produce..consume..
+```
+## ForkJoin
+主要用于并行计算中，和 MapReduce 原理类似，都是把大的计算任务拆分成多个小任务并行计算。
+```
+public class ForkJoinExample extends RecursiveTask<Integer> {
+
+    private final int threshold = 5;
+    private int first;
+    private int last;
+
+    public ForkJoinExample(int first, int last) {
+        this.first = first;
+        this.last = last;
+    }
+
+    @Override
+    protected Integer compute() {
+        int result = 0;
+        if (last - first <= threshold) {
+            // 任务足够小则直接计算
+            for (int i = first; i <= last; i++) {
+                result += i;
+            }
+        } else {
+            // 拆分成小任务
+            int middle = first + (last - first) / 2;
+            ForkJoinExample leftTask = new ForkJoinExample(first, middle);
+            ForkJoinExample rightTask = new ForkJoinExample(middle + 1, last);
+            leftTask.fork();
+            rightTask.fork();
+            result = leftTask.join() + rightTask.join();
+        }
+        return result;
+    }
+}
+```
+```
+public static void main(String[] args) throws ExecutionException, InterruptedException {
+    ForkJoinExample example = new ForkJoinExample(1, 10000);
+    ForkJoinPool forkJoinPool = new ForkJoinPool();
+    Future result = forkJoinPool.submit(example);
+    System.out.println(result.get());
+}
+```
+ForkJoin 使用 ForkJoinPool 来启动，它是一个特殊的线程池，线程数量取决于 CPU 核数。
+```
+public class ForkJoinPool extends AbstractExecutorService
+```
+ForkJoinPool 实现了工作窃取算法来提高 CPU 的利用率。每个线程都维护了一个双端队列，用来存储需要执行的任务。工作窃取算法允许空闲的线程从其它线程的双端队列中窃取一个任务来执行。窃取的任务必须是最晚的任务，避免和队列所属线程发生竞争。例如下图中，Thread2 从 Thread1 的队列中拿出最晚的 Task1 任务，Thread1 会拿出 Task2 来执行，这样就避免发生竞争。但是如果队列中只有一个任务时还是会发生竞争。
+
+# 九、线程不安全示例
+如果多个线程对同一个共享数据进行访问而不采取同步操作的话，那么操作的结果是不一致的。
+
+以下代码演示了 1000 个线程同时对 cnt 执行自增操作，操作结束之后它的值有可能小于 1000。因为多个线程对cnt进行了写操作会出现覆写的情况。
+```
+public class ThreadUnsafeExample {
+
+    private int cnt = 0;
+
+    public void add() {
+        cnt++;
+    }
+
+    public int get() {
+        return cnt;
+    }
+}
+```
+```
+public static void main(String[] args) throws InterruptedException {
+    final int threadSize = 1000;
+    ThreadUnsafeExample example = new ThreadUnsafeExample();
+    final CountDownLatch countDownLatch = new CountDownLatch(threadSize);
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    for (int i = 0; i < threadSize; i++) {
+        executorService.execute(() -> {
+            example.add();
+            countDownLatch.countDown();
+        });
+    }
+    countDownLatch.await();
+    executorService.shutdown();
+    System.out.println(example.get());
+}
+```
+```
+997
+```
+
+# 十、Java 内存模型
+Java 内存模型试图屏蔽各种硬件和操作系统的内存访问差异，以实现让 Java 程序在各种平台下都能达到一致的内存访问效果。
+## 主内存与工作内存
+处理器上的寄存器的读写的速度比内存快几个数量级，为了解决这种速度矛盾，在它们之间加入了高速缓存。
+
+加入高速缓存带来了一个新的问题：缓存一致性。如果多个缓存共享同一块主内存区域，那么多个缓存的数据可能会不一致，需要一些协议来解决这个问题。
+
+
+所有的变量都存储在主内存中，每个线程还有自己的工作内存，工作内存存储在高速缓存或者寄存器中，保存了该线程使用的变量的主内存副本拷贝。
+
+线程只能直接操作工作内存中的变量，不同线程之间的变量值传递需要通过主内存来完成。
+
+## 内存间交互操作
+- Java 内存模型定义了 8 个操作来完成主内存和工作内存的交互操作。
+- read：把一个变量的值从主内存传输到工作内存中
+- load：在 read 之后执行，把 read 得到的值放入工作内存的变量副本中
+- use：把工作内存中一个变量的值传递给执行引擎
+- assign：把一个从执行引擎接收到的值赋给工作内存的变量
+- store：把工作内存的一个变量的值传送到主内存中
+- write：在 store 之后执行，把 store 得到的值放入主内存的变量中
+- lock：作用于主内存的变量锁定
+- unlock：作用于主内存的变量解锁
+
+## 内存模型三大特性
+### 1. 原子性
+Java 内存模型保证了 read、load、use、assign、store、write、lock 和 unlock 操作具有原子性，例如对一个 int 类型的变量执行 assign 赋值操作，这个操作就是原子性的。但是 Java 内存模型允许虚拟机将没有被 volatile 修饰的 64 位数据（long，double）的读写操作划分为两次 32 位的操作来进行，即 load、store、read 和 write 操作可以不具备原子性。
+
+有一个错误认识就是，int 等原子性的类型在多线程环境中不会出现线程安全问题。前面的线程不安全示例代码中，cnt 属于 int 类型变量，1000 个线程对它进行自增操作之后，得到的值为 997 而不是 1000。
+
+为了方便讨论，将内存间的交互操作简化为 3 个：load、assign、store。
+
+下图演示了两个线程同时对 cnt 进行操作，load、assign、store 这一系列操作整体上看不具备原子性，那么在 T1 修改 cnt 并且还没有将修改后的值写入主内存，T2 依然可以读入旧值。可以看出，这两个线程虽然执行了两次自增运算，但是主内存中 cnt 的值最后为 1 而不是 2。因此对 int 类型读写操作满足原子性只是说明 load、assign、store 这些单个操作具备原子性。
+
+我们可以通过：
+- AtomicInteger 能保证多个线程修改的原子性。
+- synchronized 互斥锁来保证操作的原子性。
+
+## 2. 可见性
+可见性指当一个线程修改了共享变量的值，其它线程能够立即得知这个修改。Java 内存模型是通过在变量修改后将新值同步回主内存，在变量读取前从主内存刷新变量值来实现可见性的。
+
+主要有三种实现可见性的方式：
+
+- volatile，该关键字修饰的成员变量表明该变量不存在工作线程的副本，线程每次直接都从主内存中读取读操作远多于写操作的情况可以建议使用volatile
+- synchronized，对一个变量执行 unlock 操作之前，必须把变量值同步回主内存。
+- final，被 final 关键字修饰的字段在构造器中一旦初始化完成，并且没有发生 this 逃逸（其它线程通过 this 引用访问到初始化了一半的对象），那么其它线程就能看见 final 字段的值。
+对前面的线程不安全示例中的 cnt 变量使用 volatile 修饰，不能解决线程不安全问题，因为 volatile 并不能保证操作的原子性。
+
+## 3. 有序性
+有序性是指：在本线程内观察，所有操作都是有序的。在一个线程观察另一个线程，所有操作都是无序的，无序是因为发生了指令重排序。在 Java 内存模型中，允许编译器和处理器对指令进行重排序，重排序过程不会影响到单线程程序的执行，却会影响到多线程并发执行的正确性。
+
+volatile 关键字通过添加内存屏障的方式来禁止指令重排，即重排序时不能把后面的指令放到内存屏障之前。
+
+也可以通过 synchronized 来保证有序性，它保证每个时刻只有一个线程执行同步代码，相当于是让线程顺序执行同步代码。
+
+## 先行发生原则
+上面提到了可以用 volatile 和 synchronized 来保证有序性。除此之外，JVM 还规定了先行发生原则，让一个操作无需控制就能先于另一个操作完成。
+### 1.单一线程原则
+> Single Thread rule
+
+在一个线程内，在程序前面的操作先行发生于后面的操作。
+### 2. 管程锁定规则
+> Monitor Lock Rule
+
+一个 unlock 操作先行发生于后面对同一个锁的 lock 操作。
+
+### 3. volatile 变量规则
+> Volatile Variable Rule
+
+对一个 volatile 变量的写操作先行发生于后面对这个变量的读操作。
+
+### 4. 线程启动规则
+> Thread Start Rule
+
+Thread 对象的 start() 方法调用先行发生于此线程的每一个动作。
+
+### 5. 线程加入规则
+> Thread Join Rule
+
+Thread 对象的结束先行发生于 join() 方法返回。
+
+### 6. 线程中断规则
+Thread Interruption Rule
+
+对线程 interrupt() 方法的调用先行发生于被中断线程的代码检测到中断事件的发生，可以通过 interrupted() 方法检测到是否有中断发生。
+
+### 7. 对象终结规则
+Finalizer Rule
+
+一个对象的初始化完成（构造函数执行结束）先行发生于它的 finalize() 方法的开始。
+
+### 8. 传递性
+Transitivity
+
+如果操作 A 先行发生于操作 B，操作 B 先行发生于操作 C，那么操作 A 先行发生于操作 C。
+
+# 十一、线程安全
+多个线程不管以何种方式访问某个类，并且在主调代码中不需要进行同步，都能表现正确的行为。
+
+线程安全有以下几种实现方式：
+
+## 不可变
+不可变（Immutable）的对象一定是线程安全的，不需要再采取任何的线程安全保障措施。只要一个不可变的对象被正确地构建出来，永远也不会看到它在多个线程之中处于不一致的状态。多线程环境下，应当尽量使对象成为不可变，来满足线程安全。
+
+不可变的类型：
+
+- final 关键字修饰的基本数据类型
+- String
+- 枚举类型
+- Number 部分子类，如 Long 和 Double 等数值包装类型，BigInteger 和 BigDecimal 等大数据类型。但同为 Number 的原子类 AtomicInteger 和 AtomicLong 则是可变的。
+对于集合类型，可以使用 Collections.unmodifiableXXX() 方法来获取一个不可变的集合。
+```
+public class ImmutableExample {
+    public static void main(String[] args) {
+        Map<String, Integer> map = new HashMap<>();
+        Map<String, Integer> unmodifiableMap = Collections.unmodifiableMap(map);
+        unmodifiableMap.put("a", 1);
+    }
+}
+```
+```
+Exception in thread "main" java.lang.UnsupportedOperationException
+    at java.util.Collections$UnmodifiableMap.put(Collections.java:1457)
+    at ImmutableExample.main(ImmutableExample.java:9)
+```
+Collections.unmodifiableXXX() 先对原始的集合进行拷贝，需要对集合进行修改的方法都直接抛出异常。
+```
+public V put(K key, V value) {
+    throw new UnsupportedOperationException();
+}
+```
+## 互斥同步
+synchronized 和 ReentrantLock。
+
+## 非阻塞同步
+互斥同步最主要的问题就是线程阻塞和唤醒所带来的性能问题，因此这种同步也称为阻塞同步。
+
+互斥同步属于一种悲观的并发策略，总是认为只要不去做正确的同步措施，那就肯定会出现问题。无论共享数据是否真的会出现竞争，它都要进行加锁（这里讨论的是概念模型，实际上虚拟机会优化掉很大一部分不必要的加锁）、用户态核心态转换、维护锁计数器和检查是否有被阻塞的线程需要唤醒等操作。
+
+### 1. CAS
+随着硬件指令集的发展，我们可以使用基于冲突检测的乐观并发策略：先进行操作，如果没有其它线程争用共享数据，那操作就成功了，否则采取补偿措施（不断地重试，直到成功为止）。这种乐观的并发策略的许多实现都不需要将线程阻塞，因此这种同步操作称为非阻塞同步。
+
+乐观锁需要操作和冲突检测这两个步骤具备原子性，这里就不能再使用互斥同步来保证了，只能靠硬件来完成。硬件支持的原子性操作最典型的是：比较并交换（Compare-and-Swap，CAS）。CAS 指令需要有 3 个操作数，分别是内存地址 V、旧的预期值 A 和新值 B。当执行操作时，只有当 V 的值等于 A，才将 V 的值更新为 B。
+
+### 2. AtomicInteger
+J.U.C 包里面的整数原子类 AtomicInteger 的方法调用了 Unsafe 类的 CAS 操作。
+
+以下代码使用了 AtomicInteger 执行了自增的操作。
+```
+private AtomicInteger cnt = new AtomicInteger();
+
+public void add() {
+    cnt.incrementAndGet();
+}
+```
+以下代码是 incrementAndGet() 的源码，它调用了 Unsafe 的 getAndAddInt() 。
+```
+public final int incrementAndGet() {
+    return unsafe.getAndAddInt(this, valueOffset, 1) + 1;
+}
+```
+以下代码是 getAndAddInt() 源码，var1 指示对象内存地址，var2 指示该字段相对对象内存地址的偏移，var4 指示操作需要加的数值，这里为 1。通过 getIntVolatile(var1, var2) 得到旧的预期值，通过调用 compareAndSwapInt() 来进行 CAS 比较，如果该字段内存地址中的值等于 var5，那么就更新内存地址为 var1+var2 的变量为 var5+var4。
+
+可以看到 getAndAddInt() 在一个循环中进行，发生冲突的做法是不断的进行重试。
+```
+public final int getAndAddInt(Object var1, long var2, int var4) {
+    int var5;
+    do {
+        var5 = this.getIntVolatile(var1, var2);
+    } while(!this.compareAndSwapInt(var1, var2, var5, var5 + var4));
+
+    return var5;
+}
+```
+### 3. ABA
+如果一个变量初次读取的时候是 A 值，它的值被改成了 B，后来又被改回为 A，那 CAS 操作就会误认为它从来没有被改变过。
+
+J.U.C 包提供了一个带有标记的原子引用类 AtomicStampedReference 来解决这个问题，它可以通过控制变量值的版本来保证 CAS 的正确性。大部分情况下 ABA 问题不会影响程序并发的正确性，如果需要解决 ABA 问题，改用传统的互斥同步可能会比原子类更高效。
+
+## 无同步方案
+要保证线程安全，并不是一定就要进行同步。如果一个方法本来就不涉及共享数据，那它自然就无须任何同步措施去保证正确性。
+
+### 1. 栈封闭
+多个线程访问同一个方法的局部变量时，不会出现线程安全问题，因为局部变量存储在虚拟机栈中，属于线程私有的。
+```
+public class StackClosedExample {
+    public void add100() {
+        int cnt = 0;
+        for (int i = 0; i < 100; i++) {
+            cnt++;
+        }
+        System.out.println(cnt);
+    }
+}
+```
+```
+public static void main(String[] args) {
+    StackClosedExample example = new StackClosedExample();
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    executorService.execute(() -> example.add100());
+    executorService.execute(() -> example.add100());
+    executorService.shutdown();
+}
+```
+```
+100
+100
+```
+### 2. 线程本地存储（Thread Local Storage）
+如果一段代码中所需要的数据必须与其他代码共享，那就看看这些共享数据的代码是否能保证在同一个线程中执行。如果能保证，我们就可以把共享数据的可见范围限制在同一个线程之内，这样，无须同步也能保证线程之间不出现数据争用的问题。
+
+符合这种特点的应用并不少见，大部分使用消费队列的架构模式（如“生产者-消费者”模式）都会将产品的消费过程尽量在一个线程中消费完。其中最重要的一个应用实例就是经典 Web 交互模型中的“一个请求对应一个服务器线程”（Thread-per-Request）的处理方式，这种处理方式的广泛应用使得很多 Web 服务端应用都可以使用线程本地存储来解决线程安全问题。
+
+可以使用 java.lang.ThreadLocal 类来实现线程本地存储功能。
+
+### 3. 可重入代码（Reentrant Code）
+这种代码也叫做纯代码（Pure Code），可以在代码执行的任何时刻中断它，转而去执行另外一段代码（包括递归调用它本身），而在控制权返回后，原来的程序不会出现任何错误。
+
+可重入代码有一些共同的特征，例如不依赖存储在堆上的数据和公用的系统资源、用到的状态量都由参数中传入、不调用非可重入的方法等。
+
+# 十二、锁优化
+这里的锁优化主要是指 JVM 对 synchronized 的优化。
+## 自旋锁
+互斥同步进入阻塞状态的开销都很大，应该尽量避免。在许多应用中，共享数据的锁定状态只会持续很短的一段时间。自旋锁的思想是让一个线程在请求一个共享数据的锁时执行忙循环（自旋）一段时间，如果在这段时间内能获得锁，就可以避免进入阻塞状态。
+
+自旋锁虽然能避免进入阻塞状态从而减少开销，但是它需要进行忙循环操作占用 CPU 时间，它只适用于共享数据的锁定状态很短的场景。
+
+在 JDK 1.6 中引入了自适应的自旋锁。自适应意味着自旋的次数不再固定了，而是由前一次在同一个锁上的自旋次数及锁的拥有者的状态来决定。
+
+## 锁消除
+锁消除是指对于被检测出不可能存在竞争的共享数据的锁进行消除。
+
+锁消除主要是通过逃逸分析来支持，如果堆上的共享数据不可能逃逸出去被其它线程访问到，那么就可以把它们当成私有数据对待，也就可以将它们的锁进行消除。
+
+对于一些看起来没有加锁的代码，其实隐式的加了很多锁。例如下面的字符串拼接代码就隐式加了锁：
+```
+public static String concatString(String s1, String s2, String s3) {
+    return s1 + s2 + s3;
+}
+```
+String 是一个不可变的类，编译器会对 String 的拼接自动优化。在 JDK 1.5 之前，会转化为 StringBuffer 对象的连续 append() 操作：
+```
+public static String concatString(String s1, String s2, String s3) {
+    StringBuffer sb = new StringBuffer();
+    sb.append(s1);
+    sb.append(s2);
+    sb.append(s3);
+    return sb.toString();
+}
+```
+每个 append() 方法中都有一个同步块。虚拟机观察变量 sb，很快就会发现它的动态作用域被限制在 concatString() 方法内部。也就是说，sb 的所有引用永远不会逃逸到 concatString() 方法之外，其他线程无法访问到它，因此可以进行消除。
+
+### 锁粗化
+如果一系列的连续操作都对同一个对象反复加锁和解锁，频繁的加锁操作就会导致性能损耗。
+
+上一节的示例代码中连续的 append() 方法就属于这类情况。如果虚拟机探测到由这样的一串零碎的操作都对同一个对象加锁，将会把加锁的范围扩展（粗化）到整个操作序列的外部。对于上一节的示例代码就是扩展到第一个 append() 操作之前直至最后一个 append() 操作之后，这样只需要加锁一次就可以了。
+
