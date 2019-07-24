@@ -56,7 +56,7 @@ create table 表名(
 | java | sql |
 | --- | --- |
 | int | int |
-| char/string | char/varchar/char()/varchar() |
+| char/string | char/char()/varchar() |
 | double | double |
 | float | float |
 | boolean | boolean |
@@ -94,3 +94,45 @@ desc 表名;
 ```
 
 ## 修改表
+- 添加列：add
+- 修改列属性：modify
+- 修改列名：change
+- 删除列：drop
+- 修改表名：rename
+
+### 添加列
+> alter table 表名 add 列名 列的类型 列的约束
+```
+alter table student add grade int not null;
+```
+
+### 修改列属性
+> alter table 表名 modify 列名 列的类型 列的约束
+```
+alter table student modify sex varchar(2);
+```
+
+### 修改列名
+> alter table 表名 change 列名 新列名 新列的类型 新列的约束
+```
+alter table student change sex ssex int not null;
+```
+
+### 删除列
+> alter table 表名 drop 列名
+```
+alter table student drop grade;
+```
+
+### 修改表名
+> rename table 表名 to 新表名
+修改表名这种可能会带来较大框架变动的行为尽可能少做
+```
+rename table student to Student;
+```
+
+## 删除表
+> drop table 表名
+```
+drop table student;
+```
