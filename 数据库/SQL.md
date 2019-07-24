@@ -136,3 +136,29 @@ rename table student to Student;
 ```
 drop table student;
 ```
+
+# 表中数据的CRUD操作
+## 插入数据
+> insert into 表名(列名1，列名2，列名3) values(值1，值2，值3)
+```
+insert into student(sid,sname,ssex,age) values(1,'zhangsan',1,23);
+```
+
+### 简单写法
+表名结构可以省略，但省略时是默认所有列信息都必须插入。即如果插入的时全列名的数据，表名后的列名可以省略
+```
+insert into student values(1,'zhangsan',1,23);
+```
+如果时插入部分列的话，列名不能省略。
+```
+insert into student(sid,name) values(3,'lisi');
+```
+
+### 批量插入
+```
+insert into student values
+(1,'zhangsan',1,23),
+(2,'zhangsan',1,23),
+(3,'zhangsan',1,23),
+...;
+```
