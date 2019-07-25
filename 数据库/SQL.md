@@ -241,11 +241,11 @@ select * from product where price > 50;
 - %：代表多个字符
 - \_：代表单个字符
 查询所有带有"饼"字的商品
-```
+```sql
 select * from product where pname like '%饼%';
 ```
 查询所有第二个字符为"饼"字的商品
-```
+```sql
 select * from product where pname like '_饼';
 ```
 #### 聚合函数
@@ -254,7 +254,7 @@ select * from product where pname like '_饼';
 - count()：统计数量
 - max()：最大值
 - min()：最小值
-```
+```sql
 select sum(price) from product;
 ``` 
 注意：where后不能接聚合函数
