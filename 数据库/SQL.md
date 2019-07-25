@@ -102,13 +102,13 @@ desc 表名;
 
 ### 添加列
 > alter table 表名 add 列名 列的类型 列的约束
-```
+```sql
 alter table student add grade int not null;
 ```
 
 ### 修改列属性
 > alter table 表名 modify 列名 列的类型 列的约束
-```
+```sql
 alter table student modify sex varchar(2);
 ```
 
@@ -120,42 +120,42 @@ alter table student change sex ssex int not null;
 
 ### 删除列
 > alter table 表名 drop 列名
-```
+```sql
 alter table student drop grade;
 ```
 
 ### 修改表名
 > rename table 表名 to 新表名
 修改表名这种可能会带来较大框架变动的行为尽可能少做
-```
+```sql
 rename table student to Student;
 ```
 
 ## 删除表
 > drop table 表名
-```
+```sql
 drop table student;
 ```
 
 # 表中数据的CRUD操作
 ## 插入数据
 > insert into 表名(列名1，列名2，列名3) values(值1，值2，值3)
-```
+```sql
 insert into student(sid,sname,ssex,age) values(1,'zhangsan',1,23);
 ```
 
 ### 简单写法
 表名结构可以省略，但省略时是默认所有列信息都必须插入。即如果插入的时全列名的数据，表名后的列名可以省略
-```
+```sql
 insert into student values(1,'zhangsan',1,23);
 ```
 如果时插入部分列的话，列名不能省略。
-```
+```sql
 insert into student(sid,name) values(3,'lisi');
 ```
 
 ### 批量插入
-```
+```sql
 insert into student values
 (1,'zhangsan',1,23),
 (2,'zhangsan',1,23),
@@ -164,11 +164,11 @@ insert into student values
 ```
 ## 删除数据
 > delete from 表名 where 条件
-```
+```sql
 delete from student where sid=10;
 ```
 如果不给条件则是删除表内所有数据
-```
+```sql
 delete from student;
 ```
 ### delete和truncate
@@ -179,11 +179,11 @@ delete from student;
 
 ## 更新数据
 > update 表名 set 列名=列的值，列名2=列的值2 where 条件
-```
+```sql
 update student set sname='李四' where sid=2;
 ```
 如果不加条件，则是更新表内所有数据
-```
+```sql
 update student set sname='李四',sex=1;
 ```
 ## 查询数据
@@ -191,12 +191,12 @@ update student set sname='李四',sex=1;
 distinct：去除重复的数据
 
 ### 查询所有数据
-```
+```sql
 select * from category;
 ```
 
 ### 查询特定列
-```
+```sql
 select sname,sex from student;
 ```
 
@@ -207,13 +207,13 @@ select sname,sex from student;
 - 列别名：```select sname as 学生姓名,sex 学生性别 from student;```
 
 ### 去掉重复的值
-```
+```sql
 select distinct sex from student;
 ```
 使用distinct可以将所有重复的值剔除掉。（只是展示所有不重复的值，并不会影响数据库的数据）
 
 ### select运算查询
-```
+```sql
 select *,price*0.8 from product;
 select *,price*0.8 as 折后价 from product;
 ```
@@ -221,7 +221,7 @@ select *,price*0.8 as 折后价 from product;
 
 ### 条件查询
 指定条件，确定要操作的记录。下述语句描述的是查看product表内所有价格大于50的商品数据。
-```
+```sql
 select * from product where price > 50;
 ```
 #### 关系运算符
