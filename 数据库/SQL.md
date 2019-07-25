@@ -257,4 +257,20 @@ select * from product where pname like '_饼';
 ```sql
 select sum(price) from product;
 ``` 
-注意：where后不能接聚合函数
+注意：where后不能接聚合函数，可以使用having关键字来接聚合函数
+
+### SQL编写与执行顺序
+#### 编写顺序
+> S...F...W...G...H...O
+
+对应为：
+```sql
+select...from...where...group by...having...order by...
+```
+#### 执行顺序
+  > F...W...G...H...S...O
+
+对应为：
+```sql
+from...where...group by...having...select...order by...
+```
