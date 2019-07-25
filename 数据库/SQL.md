@@ -7,23 +7,23 @@
 
 # 数据库的CRUD操作
 ## 登陆账号
-```
+```sql
 mysql -u用户名 -p用户密码;
 ```
 ## 创建数据库
 如果不设置初始化指令，数据库将按照默认格式创建
-```
+```sql
 create database 数据库名称;
 create database 数据库名称 初始化指令;
 ```
 ## 查看数据库
 查看所有数据库
-```
+```sql
 show databases;
 ```
 
 查看指定数据库
-```
+```sql
 show create database 指定数据库名称;
 ```
 
@@ -162,3 +162,99 @@ insert into student values
 (3,'zhangsan',1,23),
 ...;
 ```
+## 删除数据
+> delete from 表名 where 条件
+```
+delete from student where sid=10;
+```
+如果不给条件则是删除表内所有数据
+```
+delete from student;
+```
+### delete和truncate
+- delete：DML，一条条删除表中的数据
+- truncate：DDL，先删除表再重建表
+
+因此，如果表内数据量较少，delete速度快于truncate。
+
+## 更新数据
+> update 表名 set 列名=列的值，列名2=列的值2 where 条件
+```
+update student set sname='李四' where sid=2;
+```
+如果不加条件，则是更新表内所有数据
+```
+update student set sname='李四',sex=1;
+```
+## 查询数据
+> select \[distinct\] \[\*\] \[列名，列名2\] from 表名 \[where 条件\]
+distinct：去除重复的数据
+
+### 查询所有数据
+```
+select * from category;
+```
+
+### 查询特定列
+```
+select sname,sex from student;
+```
+
+### 别名查询
+以as作为关键字，as关键字可以省略。
+
+- 表别名：```select s.sname,s.sex from student as s;```
+- 列别名：```select sname as 学生姓名,sex 学生性别 from student;```
+
+### 去掉重复的值
+```
+select distinct sex from student;
+```
+使用distinct可以将所有重复的值剔除掉。（只是展示所有不重复的值，并不会影响数据库的数据）
+
+### select运算查询
+```
+select *,price*0.8 from product;
+select *,price*0.8 as 折后价 from product;
+```
+此操作后会展示出一列price\*0.8的数据，使用as做别名后该列的列名将会从price\*0.8改成折后价。此操作同样不会影响数据库的数据。
+
+### 条件查询
+指定条件，确定要操作的记录。下述语句描述的是查看product表内所有价格大于50的商品数据。
+```
+select * from product where price > 50;
+```
+#### 关系运算符
+- 大于：>
+- 小于：<
+- 不大于：<=
+- 不小于：>=
+- 不等于：<>（标准SQL语法），!=（非标准SQL语法）
+- 范围内：between...and...（必须前者不大于后者）
+#### 逻辑运算符
+- and：与运算
+- or：或运算
+- not：非运算
+
+#### 模糊查询
+> select * from 表名 where 查询列名 like 关键字
+- %：代表多个字符
+- \_：代表单个字符
+查询所有带有"饼"字的商品
+```
+select * from product where pname like '%饼%';
+```
+查询所有第二个字符为"饼"字的商品
+```
+select * from product where pname like '_饼';
+```
+#### 聚合函数
+- sum()：求和
+- avg()：求平均值
+- count()：统计数量
+- max()：最大值
+- min()：最小值
+```
+select sum(price) from product;
+``` 
+注意：where后不能接聚合函数
