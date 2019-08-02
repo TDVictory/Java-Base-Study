@@ -12,25 +12,44 @@
 ## 1.1 注册驱动
 
 ```java
-DriverManager.registerDriver(new com.mysql.jdbc.Driver());
+//1.注册驱动，此时Driver为 com.mysql.jdbc.Driver
+DriverManager.registerDriver(new Driver());
 ```
 
-建立连接
+## 1.2 建立连接
 
-//DriverManager.getConnection("jdbc:mysql://localhost/test?user=monty&password=greatsqldb");
-		//2. 建立连接 参数一： 协议 + 访问的数据库 ， 参数二： 用户名 ， 参数三： 密码。
-		conn = DriverManager.getConnection("jdbc:mysql://localhost/student", "root", "root");
+conn = DriverManager.getConnection("jdbc:mysql://localhost/student", "root", "root");
 
-创建statement
+```java
+//2.建立连接
+// 建立连接 参数： url
+DriverManager.getConnection("jdbc:mysql://localhost/test?user=monty&password=greatsqldb");
+// 建立连接 参数一： 协议 + 访问的数据库 ， 参数二： 用户名 ， 参数三： 密码。
+DriverManager.getConnection("jdbc:mysql://localhost/test","monty","greatsqldb");
+```
 
-//3. 创建statement ， 跟数据库打交道，一定需要这个对象
-	st = conn.createStatement();
+## 1.3 创建statement
+
+创建statement ， 跟数据库打交道，一定需要这个对象
+
+```java
+st = conn.createStatement();
+```
+
+我们对数据库进行操作，都是通过statement下的方法
+
+## 1.4 执行查询 
 
 执行sql ，得到ResultSet
 
-//4. 执行查询 ， 得到结果集
-		String sql = "select * from t_stu";
-		rs = st.executeQuery(sql);
+```java
+String sql = "select * from t_stu";
+ResultSet rs = st.executeQuery(sql);
+```
+
+
+
+
 
 遍历结果集
 
