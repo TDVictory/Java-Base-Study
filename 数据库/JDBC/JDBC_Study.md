@@ -393,13 +393,14 @@ public void testFindAll(){
 
 > 该对象就是替换前面的statement对象。
 
-相比较以前的statement， 预先处理给定的sql语句，对其执行语法检查。 在sql语句里面使用 ? 占位符来替代后续要传递进来的变量。 后面进来的变量值，将会被看成是字符串，不会产生任何的关键字。
+相比较以前的statement， 预先处理给定的sql语句，对其执行语法检查。 在sql语句里面使用 ? 占位符来替代后续要传递进来的变量。 后面进来的变量值，将会被看成是字符串，不会产生任何的关键字。注意这里填充？占位符时是从1开始而非0.
 
 ```java
 connection = JDBCUtil.getConnection();
 PreparedStatement ps = connection.prepareStatement("select * from user where username =? and password=?");
 //st = connection.createStatement();
 //rs = st.executeQuery(sql);
+//填充序号从1开始
 ps.setString(1,username);
 ps.setString(2,password);
 rs = ps.executeQuery();
