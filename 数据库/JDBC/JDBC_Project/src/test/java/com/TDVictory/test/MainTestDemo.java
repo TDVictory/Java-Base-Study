@@ -17,22 +17,9 @@ public class MainTestDemo {
         Statement st = null;
         ResultSet rs = null;
         String sql = "select * from product";
+        UserDao userDao = new UserDaoImpl();
+        userDao.query();
 
-        try {
-            connection = JDBCUtil.getConnection();
-            st = connection.createStatement();
-            rs = st.executeQuery("select * from user");
-            while (rs.next()){
-                int id = rs.getInt("uid");
-                String str = rs.getString("username");
-
-                System.out.println(id + " " + str);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        } finally {
-            JDBCUtil.release(connection,st,rs);
-        }
     }
 
     @Test

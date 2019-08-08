@@ -10,12 +10,16 @@ public class UserDaoImpl implements UserDao {
     public void query() {
         Connection connection = null;
         Statement st = null;
+        PreparedStatement ps = null;
         ResultSet rs = null;
 
         try {
             connection = JDBCUtil.getConnection();
             st = connection.createStatement();
-            rs = st.executeQuery("select * from user");
+            ps = connection.prepareStatement("select * from user where username=?");
+            ps.setString(1,"wangwu");
+
+            rs = ps.executeQuery();
             while (rs.next()){
                 int id = rs.getInt("uid");
                 String str = rs.getString("username");
