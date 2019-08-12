@@ -99,4 +99,221 @@ Java 提供了等待唤醒机制来解决这个问题， 具体来说就是多�
 - public final native void wait(long timeout)：当前线程释放锁，并等待 timeout 毫秒
 - public final native void notify()：唤醒持有同一锁的某个线程
 - public final native void notifyAll()：唤醒持有同一锁的所有线程
-- 
+
+#### 案例1：线程交替运行
+
+```java
+//自制锁对象
+public class MyLock {
+    public static Object o = new Object();
+}
+```
+
+```java
+//循环输出10个1
+public class Thread01 extends Thread{
+    @Override
+    public void run() {
+        for (int i = 0; i < 10; i++) {
+            //以自制锁作为线程锁
+            synchronized (MyLock.o){
+                System.out.println(1);
+                //执行完当前输出后唤醒其他线程并休眠自己
+                MyLock.o.notify();
+                try {
+                    MyLock.o.wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+}
+```
+
+```java
+//循环输出10个2
+public class Thread02 extends Thread{
+    @Override
+    public void run() {
+        for (int i = 0; i < 10; i++) {
+            synchronized (MyLock.o){
+                System.out.println(2);
+                MyLock.o.notify();
+                try {
+                    MyLock.o.wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+}
+```
+
+```java
+//1和2交替输出
+public class TestThread {
+    public static void main(String[] args) {
+        Thread01 thread01 = new Thread01();
+        Thread02 thread02 = new Thread02();
+        thread01.start();
+        thread02.start();
+    }
+}
+```
+
+#### 案例2：生产者与消费者
+
+该模式在现实生活中很常见， 在项目开发中也广泛应用， 它是线程间通信的经典应用。 生产者是一堆线程， 消费者是另一堆线程， 内存缓冲区可以使用 List 集合存储数据。 该模式 的关键之处是如何处理多线程之间的协调通信， 内存缓冲区为空的时候， 消费者必须等待， 而内存缓冲区满的时候， 生产者必须等待， 其他时候可以是个动态平衡。    
+
+```java
+public class Kuang {
+    //这个集合就是水果筐 假设最多存 10 个水果
+    public static ArrayList<String> kuang=new ArrayList<String>();
+}
+```
+
+上述代码定义一个静态集合作为内存缓冲区用来存储数据， 同时这个集合也可以作为锁去被 多个线程使用    
+
+```java
+public class Child extends Thread {
+    @Override
+    public void run() {
+        //小孩的工作是不断吃水果
+        while (true){
+            synchronized (Kuang.kuang){
+                //如果框内水果等于0，小孩休息
+                if(Kuang.kuang.size() == 0){
+                    try {
+                        Kuang.kuang.wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+                //吃水果
+                Kuang.kuang.remove("fruit");
+                System.out.println("小孩吃了一个水果，现在框内还有" + Kuang.kuang.size() + "个水果");
+                Kuang.kuang.notify();
+            }
+
+            //控制速度
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+```java
+public class Farmer extends Thread{
+    @Override
+    public void run() {
+        //农夫的工作是不断放水果
+        while (true){
+            synchronized (Kuang.kuang){
+                //如果框内水果超过10，农夫休息
+                if(Kuang.kuang.size() == 10){
+                    try {
+                        Kuang.kuang.wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+                //放置水果
+                Kuang.kuang.add("fruit");
+                System.out.println("农夫放进了一个水果，现在框内还有" + Kuang.kuang.size() + "个水果");
+                Kuang.kuang.notify();
+            }
+
+            //控制速度
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+```java
+//测试类
+public class MainTest {
+    public static void main(String[] args) {
+        Child child = new Child();
+        Farmer farmer = new Farmer();
+        child.start();
+        farmer.start();
+    }
+}
+```
+
+# 二、BIO
+
+BIO有的称之为basic（基本）IO，有的称之为block（阻塞）IO，主要应用于文件 IO 和网络 IO 。
+
+在JDK1.4之前，我们建立网络连接只能采用BIO，需要先在服务器启动一个ServerSocket，然后再客户端启动Socket来对服务器进行通信，默认情况下服务端需要对每个请求建立一个线程进行通信。二客户端发送请求后，先咨询服务端是否有线程响应，如果没有则会一直等待或者遭到拒绝；如果有的话，客户端线程会等待请求结束后才继续执行，这就是阻塞式 IO。
+
+```java
+//服务器程序
+public class TCPServer {
+    public static void main(String[] args) throws IOException {
+        //1.创建ServerSocket对象
+        ServerSocket ss = new ServerSocket(9999);
+
+        while (true){
+            //2.监听客户端
+            Socket socket = ss.accept();//阻塞
+            System.out.println("监听到客户端");
+
+            //3.从连接中取出输入流来接收消息
+            BufferedReader bf = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String clientIP = socket.getInetAddress().getHostAddress();
+            System.out.println(clientIP + "输入：" + bf.readLine());
+            System.out.println("输入结束");
+
+            //4.从连接中取出输出流并回复
+            PrintWriter printWriter = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+            printWriter.write("告辞");
+            printWriter.flush();
+
+            //5.关闭连接
+            bf.close();
+            printWriter.close();
+            socket.close();
+        }
+    }
+}
+```
+
+```java
+//客户端程序
+public class TCPClient {
+    public static void main(String[] args) throws IOException {
+        //1.创建socket对象
+        Socket socket = new Socket("127.0.0.1",9999);
+
+        //2.从连接中取出输入流并发消息
+        PrintWriter printWriter = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("请输入消息");
+        String msg = scanner.nextLine();
+        printWriter.println(msg);
+        printWriter.flush();
+
+        //3.从连接中取出输出流
+        BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        System.out.println("客户端返回：" + br.readLine());
+
+        //4.关闭连接
+        printWriter.close();
+        br.close();
+        socket.close();
+    }
+}
+```
+
