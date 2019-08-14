@@ -317,3 +317,46 @@ public class TCPClient {
 }
 ```
 
+# 三、NIO 编程
+
+## 3.1 概述
+
+java.nio 全称 java non-blocking IO， 是指 JDK 提供的新 API。 从 JDK1.4 开始， Java 提供了 一系列改进的输入/输出的新特性， 被统称为 NIO(即 New IO)。 新增了许多用于处理输入输出 的类， 这些类都被放在 java.nio 包及子包下， 并且对原 java.io 包中的很多类进行改写， 新增 了满足 NIO 的功能。    
+
+![](E:\DyjUser\Study\JavaStudy\Java-Base-Study\NIO_Netty\img\NIO01.png)
+
+NIO 和 BIO 有着相同的目的和作用，但是他们的实现方式完全不同，BIO 以流的方式处理数据，而NIO以块的方式处理数据，块 I/O 的效率比流 I/O 高很多。另外，NIO 是非阻塞式的，这一点跟 BIO 也很不同，使用它可以提供非阻塞式的高伸缩性网络。
+
+NIO 主要有三大核心部分：Channel（通道），Buffer（缓冲区），Selector（选择器）。传统的 BIO 基于字节流和字符流进行操作，而 NIO 基于 Channel 和 Buffer 进行操作。数据总是从通道读取到缓冲区中，或者从缓冲区写入到通道中。Selector 用于监听多个通道的事件（比如：连接请求，数据到达等），因此使用单个线程就可以监听多个客户端通道。
+
+## 3.2 文件 IO
+
+### 3.2.1 概述和核心 API
+
+#### Buffer（缓冲区）
+
+缓冲区（Buffer）：实际上是一个容器，是一个特殊的数组，缓冲区对象内置了一些机制，能够跟踪和记录缓冲区的状态变化情况。Channel提供从文件、网络读取数据的渠道，但是读取或写入的数据都必须经由 Buffer。
+
+![](E:\DyjUser\Study\JavaStudy\Java-Base-Study\NIO_Netty\img\NIO02.png)
+
+在 NIO中，Buffer是一个顶层父类，他是一个抽象类，常用的 Buffer 子类有：
+
+- **ByteBuffer**， 存储字节数据到缓冲区
+- **ShortBuffer**， 存储字符串数据到缓冲区    
+- **CharBuffer**， 存储字符数据到缓冲区 
+- **IntBuffer**， 存储整数数据到缓冲区 
+- **LongBuffer**， 存储长整型数据到缓冲区 
+- **DoubleBuffer**， 存储小数到缓冲区 
+- **FloatBuffer**， 存储小数到缓冲区    
+
+对于 Java 中的基本数据类型， 都有一个 Buffer 类型与之相对应， 最常用的自然是 ByteBuffer 类（ 二进制数据） ， 该类的主要方法如下所示： 
+
+- public abstract ByteBuffer **put(byte[] b)**; 存储字节数据到缓冲区 
+- public abstract byte[] **get()**; 从缓冲区获得字节数据 
+- public final byte[] **array()**; 把缓冲区数据转换成字节数组 
+- public static ByteBuffer **allocate(int capacity)**; 设置缓冲区的初始容量 
+- public static ByteBuffer **wrap(byte[] array)**; 把一个现成的数组放到缓冲区中使用 
+- public final Buffer **flip()**; 翻转缓冲区， 重置位置到初始位置    
+
+#### Channel（通道）
+
