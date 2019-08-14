@@ -360,3 +360,140 @@ NIO 主要有三大核心部分：Channel（通道），Buffer（缓冲区），
 
 #### Channel（通道）
 
+通道（ Channel） ： 类似于 BIO 中的 stream， 例如 FileInputStream 对象， 用来建立到目 标（ 文件， 网络套接字， 硬件设备等） 的一个连接， 但是需要注意： BIO 中的 stream 是单向 的， 例如 FileInputStream 对象只能进行读取数据的操作， 而 NIO 中的通道(Channel)是双向的， 既可以用来进行读操作， 也可以用来进行写操作。 常用的 Channel 类有： 
+
+- FileChannel 用于文件的数据读写
+- DatagramChannel 用于 UDP 的数据读写
+- ServerSocketChannel 用于 TCP 的 服务器数据读写。
+
+- SocketChannel 用于 TCP 的 客户端数据读写。
+
+![](E:\DyjUser\Study\JavaStudy\Java-Base-Study\NIO_Netty\img\NIO03.png)
+
+主要方法如下所示： 
+
+- public int read(ByteBuffer dst) ， 从通道读取数据并放到缓冲区中 
+- public int write(ByteBuffer src) ， 把缓冲区的数据写到通道中 
+- public long transferFrom(ReadableByteChannel src, long position, long count)， 从目标通道 中复制数据到当前通道
+- public long transferTo(long position, long count, WritableByteChannel target)， 把数据从当 前通道复制给目标通道    
+
+### 3.2.2 案例
+
+#### 1.往本地文件中写数据
+
+NIO 中的通道是从输出流对象里通过 getChannel 方法获取到的， 该通道是双向的， 既可 以读， 又可以写。 在往通道里写数据之前， 必须通过 put 方法把数据存到 ByteBuffer 中， 然 后通过通道的 write 方法写数据。 在 write 之前， 需要调用 flip 方法翻转缓冲区， 把内部重置 到初始位置， 这样在接下来写数据时才能把所有数据写到通道里。 
+
+```java
+public void readTest() throws IOException {
+    //1.创建输出流
+    FileOutputStream fos = new FileOutputStream("basic.txt");
+    //2.从流中得到一个通道
+    FileChannel fc = fos.getChannel();
+    //3.提供一个缓冲区
+    ByteBuffer buffer = ByteBuffer.allocate(1024);
+    //4.往缓冲区中存入数据
+    buffer.put("hello,nio".getBytes());        
+    //5.反转缓冲区
+    buffer.flip();
+    //6.把缓冲区写到通道中
+    fc.write(buffer);
+    //7.关闭
+    fos.close();
+}
+```
+
+#### 2. 从本地文件中读数据
+
+从输入流中获得一个通道， 然后提供 ByteBuffer 缓冲区， 该缓冲区的初始容量 和文件的大小一样， 最后通过通道的 read 方法把数据读取出来并存储到了 ByteBuffer 中。    
+
+```java
+public void writeTest() throws IOException{
+	//1.创建输入流
+    File file = new File("basic.txt");
+    FileInputStream fis = new FileInputStream(file);
+    //2.获取通道
+    FileChannel fileChannel = fis.getChannel();
+    //3.提供缓冲区
+    ByteBuffer buffer = ByteBuffer.allocate((int)file.length());
+    //4.读入数据
+    fileChannel.read(buffer);
+    //5.输出数据
+    System.out.println(new String(buffer.array()));
+    //6.关闭
+    fis.close();
+}
+```
+
+#### 3. 文件复制
+
+```java
+//传统BIO复制
+public void bioCopyTest() throws Exception{
+    FileInputStream fis=new FileInputStream("C:\\Users\\zdx\\Desktop\\oracle.mov");
+    FileOutputStream fos=new FileOutputStream("d:\\oracle.mov");
+    byte[] b=new byte[1024];
+    while (true) {
+        int res=fis.read(b);
+        if(res==-1){
+            break;
+        } 
+        fos.write(b,0,res);
+    } 
+    fis.close();
+    fos.close();
+}
+```
+
+```java
+//NIO复制
+public void nioCopyTest() throws Exception{
+    FileInputStream fis=new FileInputStream("C:\\Users\\zdx\\Desktop\\oracle.mov");
+    FileOutputStream fos=new FileOutputStream("d:\\oracle.mov");
+    FileChannel sourceCh = fis.getChannel();
+    FileChannel destCh = fos.getChannel();
+    destCh.transferFrom(sourceCh, 0, sourceCh.size());
+    sourceCh.close();
+    destCh.close();
+}
+```
+
+上述代码分别从两个流中得到两个通道， sourceCh 负责读数据， destCh 负责写数据， 然 后直接调用 transferFrom 方法一步到位实现了文件复制。    
+
+## 3.3 网络 IO
+
+### 3.3.1 概述和核心 API
+
+前面在进行文件 IO 时用到的 FileChannel 并不支持非阻塞操作， 学习 NIO 主要就是进行 网络 IO， Java NIO 中的网络通道是非阻塞 IO 的实现， 基于事件驱动， 非常适用于服务器需 要维持大量连接， 但是数据交换量不大的情况， 例如一些即时通信的服务等等.... 在 Java 中编写 Socket 服务器， 通常有以下几种模式：
+
+- 一个客户端连接用一个线程，优点：程序编写简单；缺点：如果连接非常多，分配的线 程也会非常多，服务器可能会因为资源耗尽而崩溃。
+- 把每一个客户端连接交给一个拥有固定数量线程的连接池，优点： 程序编写相对简单，可以处理大量的连接。 确定：线程的开销非常大，连接如果非常多，排队现象会比较严重。    
+- 使用 Java 的 NIO， 用非阻塞的 IO 方式处理。这种模式可以用一个线程，处理大量的客户端连接。    
+
+#### 1. Selector
+
+Selector(选择器)， 能够检测多个注册的通道上是否有事件发生，如果有事件发生，便获取事件然后针对每个事件进行相应的处理。这样就可以只用一个单线程去管理多个通道，也就是管理多个连接。这样使得只有在连接真正有读写事件发生时， 才会调用函数来进行读写，就大大地减少了系统开销，并且不必为每个连接都创建一个线程，不用去维护多个线程，并且避免了多线程之间的上下文切换导致的开销。
+
+该类的常用方法如下所示： 
+
+- public static Selector **open()**， 得到一个选择器对象 
+- public int **select(long timeout)**，监控所有注册的通道，当其中有 IO 操作可以进行时，将对应的 SelectionKey 加入到内部集合中并返回，参数用来设置超时时间 
+- public Set<SelectionKey> **selectedKeys()**，从内部集合中得到所有的 SelectionKey
+
+#### 2. SelectionKey
+
+SelectionKey， 代表了 Selector 和网络通道的注册关系,一共四种： 
+
+- int **OP_ACCEPT**： 有新的网络连接可以 accept， 值为 16 
+- int **OP_CONNECT**： 代表连接已经建立， 值为 8 
+- int **OP_READ** 和 int **OP_WRITE**： 代表了读、 写操作， 值为 1 和 4    
+
+该类的常用方法有：
+
+- public abstract Selector **selector()**， 得到与之关联的 Selector 对象 
+- public abstract SelectableChannel **channel()**， 得到与之关联的通道 
+- public final Object **attachment()**， 得到与之关联的共享数据 
+- public abstract SelectionKey **interestOps(int ops)**， 设置或改变监听事件 
+- public final boolean **isAcceptable()**， 是否可以 accept 
+- public final boolean **isReadable()**， 是否可以读 
+- public final boolean **isWritable()**， 是否可以写    
+
