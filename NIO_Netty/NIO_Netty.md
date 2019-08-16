@@ -524,5 +524,296 @@ SocketChannel， 网络 IO 通道， 具体负责进行读写操作。 NIO 总�
 
 ### 3.3.2 案例
 
+API 学习完毕后，接下来我们使用 NIO 开发一个入门案例，实现服务器端和客户端之间 的数据通信（ 非阻塞）   
 
+![](E:\DyjUser\Study\JavaStudy\Java-Base-Study\NIO_Netty\img\NIO04.png)
+
+```java
+//网络服务器端程序
+public class NIOServer {
+    public static void main(String[] args) throws IOException {
+        //1.得到ServerSocketChannel
+        ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+
+        //2.得到Selector
+        Selector selector = Selector.open();
+
+        //3.绑定端口号
+        serverSocketChannel.bind(new InetSocketAddress(9999));
+
+        //4.设置非阻塞
+        serverSocketChannel.configureBlocking(false);
+
+        //5.把ServerSocketChannel注册给Selector
+        serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+        //6.逻辑整体
+        while (true){
+            //6.1 监控客户端
+            if(selector.select(2000) == 0){
+                System.out.println("服务器端：当前没有客户端连接");
+                continue;
+            }
+
+            //6.2 得到SelectionKey，判断通道里的事件
+            Iterator<SelectionKey> keyIterator = selector.selectedKeys().iterator();
+            while (keyIterator.hasNext()){
+                SelectionKey selectionKey = keyIterator.next();
+                if(selectionKey.isAcceptable()){    //客户端连接事件
+                    System.out.println("客户端连接");
+                    SocketChannel socketChannel = serverSocketChannel.accept();
+                    socketChannel.configureBlocking(false);
+                    socketChannel.register(selector,SelectionKey.OP_READ);
+                }
+                if (selectionKey.isReadable()){     //客户端读取事件
+                    System.out.println("客户端读取事件");
+                    SocketChannel channel = (SocketChannel) selectionKey.channel();
+                    ByteBuffer buffer = ByteBuffer.allocate(1024);
+                    channel.read(buffer);
+                    System.out.println("客户端发来数据：" + new String(buffer.array()));
+                }
+                //6.3 手动移除当前key，防止重复处理
+                keyIterator.remove();
+            }
+        }
+    }
+}
+```
+
+上面代码用 NIO 实现了一个服务器端程序，能不断接受客户端连接并读取客户端发过来的数据    
+
+```java
+//网络客户端程序
+public class NIOClient {
+    public static void main(String[] args) throws IOException {
+        //1.得到一个网络通道
+        SocketChannel socketChannel = SocketChannel.open();
+
+        //2.设置阻塞方式
+        socketChannel.configureBlocking(false);
+
+        //3.提供服务器的IP地址和端口号
+        InetSocketAddress address = new InetSocketAddress("127.0.0.1",9999);
+
+        //4.连接服务器
+        if (!socketChannel.connect(address)){
+            while (!socketChannel.finishConnect()){
+                System.out.println("客户端可以执行额外工作");
+            }
+        }
+
+        //5.得到缓冲区，存入数据
+        String msg = "Hello,Server";
+        ByteBuffer writeBuf = ByteBuffer.wrap(msg.getBytes());
+
+        //6.发送数据
+        socketChannel.write(writeBuf);
+
+        System.in.read();
+
+    }
+}
+```
+
+### 3.3.3 网络聊天案例
+
+```java
+//聊天程序客户端
+public class ChatClient {
+    private static final String HOST = "127.0.0.1";
+    private static final int PORT = 9999;
+    private String userName;
+    private SocketChannel socketChannel;
+    private InetSocketAddress address;
+
+    public ChatClient() {
+
+        try {
+            address = new InetSocketAddress(HOST,PORT);
+            socketChannel = SocketChannel.open();
+            socketChannel.configureBlocking(false);
+            if(!socketChannel.connect(address)){
+                while (!socketChannel.finishConnect()){
+                    System.out.println("持续连接服务器中...");
+                }
+            }
+            userName = socketChannel.getLocalAddress().toString().substring(1);
+            System.out.println(("---Client(" + userName + ") is ready!---"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    //向服务器发送消息
+    public void sendMsg(String msg) throws IOException {
+        if(msg.equalsIgnoreCase("bye")){
+            socketChannel.close();
+            return;
+        }
+        msg = userName + "说：" + msg;
+        ByteBuffer buffer = ByteBuffer.wrap(msg.getBytes());
+        socketChannel.write(buffer);
+    }
+
+    //从服务器端接受数据
+    public void receiveMsg() throws IOException {
+        ByteBuffer buffer = ByteBuffer.allocate(1024);
+        int size = socketChannel.read(buffer);
+        if(size > 0){
+            String msg = new String(buffer.array());
+            System.out.println(msg.trim());
+        }
+
+    }
+}
+```
+
+```java
+//聊天程序服务器端
+public class ChatServer {
+    private ServerSocketChannel serverSocketChannel;    //监听通道
+    private Selector selector;  //轮询器
+    private static final int PORT = 9999;   //服务器端口号
+
+    public ChatServer() {
+        try {
+            serverSocketChannel = ServerSocketChannel.open();
+            selector = Selector.open();
+            serverSocketChannel.configureBlocking(false);
+            serverSocketChannel.bind(new InetSocketAddress(PORT));
+            serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+            System.out.println("服务器已就绪！");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public void start(){
+
+            try {
+                while (true){
+                    if(selector.select(2000) == 0){
+                        System.out.println("当前暂无客户端响应");
+                        continue;
+                    }
+                    Iterator<SelectionKey> keyIterator = selector.selectedKeys().iterator();
+                    while (keyIterator.hasNext()){
+                        SelectionKey selectionKey = keyIterator.next();
+                        if(selectionKey.isAcceptable()){
+                            ///ServerSocketChannel ssl = (ServerSocketChannel) selectionKey.channel();
+                            SocketChannel socketChannel = serverSocketChannel.accept();
+                            socketChannel.configureBlocking(false);
+                            socketChannel.register(selector,SelectionKey.OP_READ);
+                            System.out.println(socketChannel.getRemoteAddress().toString().substring(1) + "已连接...");
+                        }
+                        else if (selectionKey.isReadable()){
+                            readMsg(selectionKey);
+                        }
+                        keyIterator.remove();
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+    }
+
+    //读取客户端发来的消息并广播出去
+    private void readMsg(SelectionKey selectionKey) throws IOException {
+        SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+        ByteBuffer buffer = ByteBuffer.allocate(1024);
+        int count = socketChannel.read(buffer);
+        if(count > 0){
+            String msg = new String(buffer.array());
+            printInfo(msg);
+
+            //发广播
+            boardCast(socketChannel,msg);
+        }
+    }
+
+    //给所有的客户端发送广播
+    private void boardCast(SocketChannel socketChannel, String msg) throws IOException {
+        System.out.println("服务器发送了广播");
+        for (SelectionKey key:selector.keys()
+             ) {
+            Channel targetChannel = key.channel();
+            if(targetChannel instanceof SocketChannel && targetChannel != socketChannel){
+                SocketChannel destChannel = (SocketChannel) key.channel();
+                ByteBuffer buffer = ByteBuffer.wrap(msg.getBytes());
+                destChannel.write(buffer);
+            }
+        }
+
+    }
+
+
+    private void printInfo(String str){
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        System.out.println("[" + sdf.format(new Date()) + "] -> " + str);
+    }
+
+    public static void main(String[] args) {
+        ChatServer server = new ChatServer();
+        server.start();
+    }
+}
+
+```
+
+```java
+//客户端启动
+public class TestChat {
+    public static void main(String[] args) throws IOException {
+        ChatClient chatClient = new ChatClient();
+
+        new Thread(){
+            @Override
+            public void run() {
+                while (true){
+                    try {
+                        chatClient.receiveMsg();
+                        Thread.sleep(2000);
+                    } catch (IOException | InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                }
+            }
+        }.start();
+
+        Scanner scanner = new Scanner(System.in);
+        while (scanner.hasNextLine()){
+            String msg = scanner.nextLine();
+            chatClient.sendMsg(msg);
+        }
+    }
+}
+```
+
+## 3.4 AIO 编程
+
+JDK 7 引入了 Asynchronous I/O， 即 AIO。 在进行 I/O 编程中， 常用到两种模式： Reactor 和 Proactor。 Java 的 NIO 就是 Reactor， 当有事件触发时， 服务器端得到通知， 进行相应的 处理。 AIO 即 NIO2.0， 叫做异步不阻塞的 IO。 AIO 引入异步通道的概念， 采用了 Proactor 模式， 简化了程序编写， 一个有效的请求才启动一个线程， 它的特点是先由操作系统完成后才通知 服务端程序启动线程去处理， 一般适用于连接数较多且连接时间较长的应用。    
+
+## 3.5 IO 对比总结
+
+IO 的方式通常分为几种： 同步阻塞的 BIO、 同步非阻塞的 NIO、 异步非阻塞的 AIO。 
+
+- BIO 方式适用于连接数目比较小且固定的架构， 这种方式对服务器资源要求比较高， 并 发局限于应用中， JDK1.4 以前的唯一选择， 但程序直观简单易理解。 
+
+- NIO 方式适用于连接数目多且连接比较短（轻操作） 的架构， 比如聊天服务器， 并发局 限于应用中， 编程比较复杂， JDK1.4 开始支持。 
+
+- AIO 方式使用于连接数目多且连接比较长（重操作） 的架构， 比如相册服务器， 充分调 用 OS 参与并发操作， 编程比较复杂， JDK7 开始支持。
+
+   举个例子再理解一下： 
+
+- 同步阻塞： 你到饭馆点餐， 然后在那等着， 啥都干不了， 饭馆没做好， 你就必须等着！ 
+
+- 同步非阻塞： 你在饭馆点完餐， 就去玩儿了。 不过玩一会儿， 就回饭馆问一声： 好了没 啊！ 
+
+- 异步非阻塞： 饭馆打电话说， 我们知道您的位置， 一会给你送过来， 安心玩儿就可以了， 类似于现在的外卖。    
+
+# 四、Netty
 
