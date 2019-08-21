@@ -1119,3 +1119,160 @@ public class NettyClient {
 
 ## 4.5 网络聊天案例
 
+```java
+public class ChatServerHandler extends SimpleChannelInboundHandler<String> {
+
+    public static List<Channel> channels = new ArrayList<>();
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        Channel inChannel = ctx.channel();
+        channels.add(inChannel);
+        System.out.println("[Server]:" + inChannel.remoteAddress().toString().substring(1) + "上线");
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        Channel inChannel = ctx.channel();
+        channels.remove(inChannel);
+        System.out.println("[Server]:" + inChannel.remoteAddress().toString().substring(1) + "离线");
+    }
+
+    @Override
+    protected void channelRead0(ChannelHandlerContext channelHandlerContext, String s) throws Exception {
+        Channel inChannel = channelHandlerContext.channel();
+        for (Channel channel:channels
+             ) {
+            if(channel != inChannel){
+                channel.writeAndFlush("[" + inChannel.remoteAddress().toString().substring(1) + "]: " + s + "\n");
+            }
+        }
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        Channel incoming = ctx.channel();
+        System.out.println("[Server]:"+incoming.remoteAddress().toString().substring(1)+"异常");
+        ctx.close();
+    }
+}
+```
+
+上述代码通过继承 SimpleChannelInboundHandler 类自定义了一个服务器端业务处理类， 并在该类中重写了四个方法， 当通道就绪时， 输出在线； 当通道未就绪时， 输出下线； 当通 道发来数据时， 读取数据； 当通道出现异常时， 关闭通道。    
+
+```java
+public class ChatServer {
+    private int port;
+
+    public ChatServer(int port) {
+        this.port = port;
+    }
+
+    public void run() throws InterruptedException {
+        EventLoopGroup bossGroup = new NioEventLoopGroup();
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
+
+        try {
+            ServerBootstrap serverBootstrap = new ServerBootstrap();
+            serverBootstrap.group(bossGroup, workerGroup)
+                    .channel(NioServerSocketChannel.class)
+                    .option(ChannelOption.SO_BACKLOG, 128)
+                    .childOption(ChannelOption.SO_KEEPALIVE, true)
+                    .childHandler(new ChannelInitializer<SocketChannel>() {
+                        @Override
+                        protected void initChannel(SocketChannel socketChannel) throws Exception {
+                            ChannelPipeline channelPipeline = socketChannel.pipeline();
+                            channelPipeline.addLast("decoder",new StringDecoder());
+                            channelPipeline.addLast("encoder",new StringEncoder());
+                            channelPipeline.addLast(new ChatServerHandler());
+                        }
+                    });
+
+            System.out.println("Netty服务器启动");
+
+            ChannelFuture cf = serverBootstrap.bind(port).sync();
+            cf.channel().closeFuture().sync();
+        }catch (Exception e){
+
+        }finally {
+            bossGroup.shutdownGracefully();
+            workerGroup.shutdownGracefully();
+        }
+
+
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        ChatServer server = new ChatServer(9999);
+        server.run();
+    }
+}
+```
+
+上述代码通过 Netty 编写了一个服务器端程序， 里面要特别注意的是： 我们往 Pipeline 链中添加了处理字符串的编码器和解码器， 它们加入到 Pipeline 链中后会自动工作， 使得我 们在服务器端读写字符串数据时更加方便（不用人工处理 ByteBuf）     
+
+```java
+public class ChatClientHandler extends SimpleChannelInboundHandler<String> {
+    @Override
+    protected void channelRead0(ChannelHandlerContext channelHandlerContext, String s) throws Exception {
+        System.out.println(s.trim());
+    }
+}
+```
+
+上述代码通过继承 SimpleChannelInboundHandler 自定义了一个客户端业务处理类， 重写了一个方法用来读取服务器端发过来的数据    
+
+```java
+public class ChatClient {
+    private String HOST;
+    private int PORT;
+
+    public ChatClient(String HOST, int PORT) {
+        this.HOST = HOST;
+        this.PORT = PORT;
+    }
+
+    public void run(){
+        EventLoopGroup group = new NioEventLoopGroup();
+
+        try {
+            Bootstrap bootstrap = new Bootstrap();
+            bootstrap.group(group)
+                    .channel(NioSocketChannel.class)
+                    .handler(new ChannelInitializer<SocketChannel>() {
+                        @Override
+                        protected void initChannel(SocketChannel socketChannel) throws Exception {
+                            ChannelPipeline channelPipeline = socketChannel.pipeline();
+                            channelPipeline.addLast("decoder",new StringDecoder());
+                            channelPipeline.addLast("encoder",new StringEncoder());
+                            channelPipeline.addLast(new ChatClientHandler());
+                        }
+                    });
+            ChannelFuture cf = bootstrap.connect(HOST,PORT).sync();
+            Channel channel = cf.channel();
+            System.out.println("------" + channel.localAddress().toString().substring(1) + "------");
+            Scanner scanner = new Scanner(System.in);
+            while (scanner.hasNextLine()){
+                String msg = scanner.nextLine();
+                channel.writeAndFlush(msg);
+            }
+        }catch (Exception e){
+
+        }finally {
+            group.shutdownGracefully();
+        }
+
+    }
+
+    public static void main(String[] args) {
+        ChatClient client = new ChatClient("127.0.0.1",9999);
+        client.run();
+    }
+}
+```
+
+上述代码通过 Netty 编写了一个客户端程序， 里面要特别注意的是： 我们往 Pipeline 链 中添加了处理字符串的编码器和解码器， 他们加入到 Pipeline 链中后会自动工作， 使得我们 在客户端读写字符串数据时更加方便（不用人工处理 ByteBuf）    
+
+
+
+## 4.6 编码和解码
+
