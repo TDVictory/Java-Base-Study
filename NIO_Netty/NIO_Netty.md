@@ -1157,7 +1157,7 @@ public class ChatServerHandler extends SimpleChannelInboundHandler<String> {
 }
 ```
 
-上述代码通过继承 SimpleChannelInboundHandler 类自定义了一个服务器端业务处理类， 并在该类中重写了四个方法， 当通道就绪时， 输出在线； 当通道未就绪时， 输出下线； 当通 道发来数据时， 读取数据； 当通道出现异常时， 关闭通道。    
+​	上述代码通过继承 SimpleChannelInboundHandler 类自定义了一个服务器端业务处理类， 并在该类中重写了四个方法， 当通道就绪时， 输出在线； 当通道未就绪时， 输出下线； 当通 道发来数据时， 读取数据； 当通道出现异常时， 关闭通道。    
 
 ```java
 public class ChatServer {
@@ -1208,7 +1208,7 @@ public class ChatServer {
 }
 ```
 
-上述代码通过 Netty 编写了一个服务器端程序， 里面要特别注意的是： 我们往 Pipeline 链中添加了处理字符串的编码器和解码器， 它们加入到 Pipeline 链中后会自动工作， 使得我 们在服务器端读写字符串数据时更加方便（不用人工处理 ByteBuf）     
+​	上述代码通过 Netty 编写了一个服务器端程序， 里面要特别注意的是： 我们往 Pipeline 链中添加了处理字符串的编码器和解码器， 它们加入到 Pipeline 链中后会自动工作， 使得我 们在服务器端读写字符串数据时更加方便（不用人工处理 ByteBuf）     
 
 ```java
 public class ChatClientHandler extends SimpleChannelInboundHandler<String> {
@@ -1219,7 +1219,7 @@ public class ChatClientHandler extends SimpleChannelInboundHandler<String> {
 }
 ```
 
-上述代码通过继承 SimpleChannelInboundHandler 自定义了一个客户端业务处理类， 重写了一个方法用来读取服务器端发过来的数据    
+​	上述代码通过继承 SimpleChannelInboundHandler 自定义了一个客户端业务处理类， 重写了一个方法用来读取服务器端发过来的数据    
 
 ```java
 public class ChatClient {
@@ -1270,9 +1270,123 @@ public class ChatClient {
 }
 ```
 
-上述代码通过 Netty 编写了一个客户端程序， 里面要特别注意的是： 我们往 Pipeline 链 中添加了处理字符串的编码器和解码器， 他们加入到 Pipeline 链中后会自动工作， 使得我们 在客户端读写字符串数据时更加方便（不用人工处理 ByteBuf）    
+​	上述代码通过 Netty 编写了一个客户端程序， 里面要特别注意的是： 我们往 Pipeline 链 中添加了处理字符串的编码器和解码器， 他们加入到 Pipeline 链中后会自动工作， 使得我们 在客户端读写字符串数据时更加方便（不用人工处理 ByteBuf）    
 
 
 
 ## 4.6 编码和解码
+
+### 4.6.1 概述
+
+​	我们在编写网络应用程序的时候需要注意codec（编解码器），因为数据在网络中传输的是二进制字节码数据，而我们拿到的目标数据往往不是字节码数据。因此在发送数据时就需要编码，接收数据时就需要解码。
+
+​	codec 的组成部分有两个：decoder（解码器）和 encoder（编码器）。encoder 负责把业务数据转换成字节码数据，decoder 负责把字节码数据转换成业务数据。
+
+其实 Java 的序列化技术就可以作为 codec 去使用，但是它的硬伤太多：
+
+ 	1. 无法跨语言，Java 序列化最为致命的问题
+	2. 序列化后的体积太大，时二进制编码的 5 倍多。
+	3. 序列化的性能太低。
+
+由于 Java 序列化技术硬伤太多，因此 Netty 自身提供了一些 codec：
+
+1. StringDecoder/StringEncoder，对字符串数据进行编解码
+2. ObjectDecoder/ObjectEncoder，对 Java 对象进行编解码
+
+Netty 本身自带的 ObjectDecoder 和 ObjectEncoder 可以用来实现 POJO 对象或各种业务对象的编码和解码， 但其内部使用的仍是 Java 序列化技术， 所以我们不建议使用。 因此对于 POJO 对象或各种业务对象要实现编码和解码， 我们需要更高效更强的技术。   
+
+### 4.6.2 Google 的 Protobuf
+
+ Protobuf 是 Google 发布的开源项目， 全称 Google Protocol Buffers， 特点如下： 
+
+- 支持跨平台、 多语言（支持目前绝大多数语言， 例如 C++、 C#、 Java、 python 等） 
+- 高性能， 高可靠性 
+- 使用 protobuf 编译器能自动生成代码， Protobuf 是将类的定义使用.proto 文件进行描述， 然后通过 protoc.exe 编译器根据.proto 自动生成.java 文件    
+
+目前在使用 Netty 开发时， 经常会结合 Protobuf 作为 codec (编解码器)去使用， 具体用法如下所示 ：
+
+1. 在 pom 文件中引入 protobuf 
+
+```xml
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>3.6.1</version>
+        </dependency>
+```
+
+2. 假设我们要处理的数据是图书信息， 那就需要为此编写 proto 文件    
+
+```protobuf
+syntax = "proto3";
+option java_outer_classname = "BookMessage";
+message Book {
+    int32 id = 1;
+    string name = 2;
+}
+```
+
+3. 通过 protoc.exe 根据描述文件生成 Java 类   
+
+   -  下载protoc文件，在其中找到protoc.exe
+   - 通过命令行进入对应文件夹，键入```protoc -- java_out=. Book.proto```并回车运行。生成BookMessage.java
+
+4. 把生成的 BookMessage.java 拷贝至项目工程中。
+
+5. 在Netty工程中使用该类作为POJO
+
+   ```java
+   //客户端业务处理类
+   public class NettyClientHandler extends ChannelInboundHandlerAdapter {
+       @Override
+       public void channelActive(ChannelHandlerContext ctx) throws Exception {
+           //设置发送的参数
+           BookMessage.Book book = BookMessage.Book.newBuilder().setId(1).setName("Java从入门到精通").build();
+           ctx.writeAndFlush(book);
+       }
+   }
+   ```
+
+   ```java
+   bootstrap.group(group)
+       .channel(NioSocketChannel.class)
+       .handler(new ChannelInitializer<SocketChannel>() {
+           @Override
+           protected void initChannel(SocketChannel socketChannel) throws Exception {
+               //添加编码器，设置Handler
+               socketChannel.pipeline().addLast("encoder",new ProtobufEncoder());
+               socketChannel.pipeline().addLast(new NettyClientHandler());
+           }
+       });
+   ```
+
+   ```java
+   //服务器端业务处理类
+   public class NettyServerHandler extends ChannelInboundHandlerAdapter {
+       //读取数据事件
+       @Override
+       public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+           //服务器端接收对应POJO
+           BookMessage.Book book = (BookMessage.Book)msg;
+           System.out.println("客户端发来的消息：" + book.getName());
+       }
+   }
+   ```
+
+   ```java
+   serverBootstrap.group(bossGroup,workerGroup)
+       .channel(NioServerSocketChannel.class)
+       .option(ChannelOption.SO_BACKLOG,128)
+       .childOption(ChannelOption.SO_KEEPALIVE,true)
+       .childHandler(new ChannelInitializer<SocketChannel>() {
+           @Override
+           protected void initChannel(SocketChannel socketChannel) throws Exception {
+               //添加解码器，设置接收类型
+               socketChannel.pipeline().addLast("decoder",new ProtobufDecoder(BookMessage.Book.getDefaultInstance()));
+               socketChannel.pipeline().addLast(new NettyServerHandler());
+           }
+       });
+   ```
+
+   
 
