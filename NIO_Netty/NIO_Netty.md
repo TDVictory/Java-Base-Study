@@ -1388,5 +1388,25 @@ message Book {
        });
    ```
 
-   
+# 五、自定义 RPC
+
+## 5.1 概述
+
+​	RPC（Remote Procedure Call），即远程过程调用，它是一种通过网络从远程计算机程序上请求服务，而不需要了解底层网络实现的技术。常见的 RPC 框架有：阿里的 Dubbo，Spring旗下的 Spring Cloud，Google 出品的 grpc等等。
+
+![](E:\DyjUser\Study\JavaStudy\Java-Base-Study\NIO_Netty\img\NIO13.png)
+
+1. 服务消费方（client）以本地调用方式调用服务
+2. client stub 接收到调用后负责将方法、参数等封装成能够进行网络传输的消息体。
+3. client stub 将消息进行编码并发送到服务端 
+4. server stub 收到消息后进行解码 
+5. server stub 根据解码结果调用本地的服务 
+6. 本地服务执行并将结果返回给 server stub 
+7. server stub 将返回导入结果进行编码并发送至消费方 
+8. client stub 接收到消息并进行解码 
+9. 服务消费方(client)得到结果    
+
+RPC 的目标就是将 2-8 这些步骤都封装起来， 用户无需关心这些细节， 可以像调用本地方法一样即可完成远程服务调用。 
+
+
 
